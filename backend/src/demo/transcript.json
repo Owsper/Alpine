@@ -1,0 +1,62 @@
+[
+	{
+		"role": "interviewer",
+		"text": "I am an AI interviewer, not a human. This is practice only, it is not part of any hiring or selection process, and I am not affiliated with any company mentioned. Only the text transcript of this session is saved, no audio is stored.",
+		"question_id": null
+	},
+	{
+		"role": "interviewer",
+		"text": "Walk me through how you would design a REST API that shows a customer their recent payments.",
+		"question_id": "7c1e4a52-3b0d-4f6e-9a21-5d8e6f0b1a01"
+	},
+	{
+		"role": "candidate",
+		"text": "I would make a GET endpoint for the payments with pagination, because a customer can have a lot of them. I would use cursor pagination since new payments keep coming in. The response has the amount, the date and the merchant, and it needs authentication so people only see their own payments.",
+		"question_id": "7c1e4a52-3b0d-4f6e-9a21-5d8e6f0b1a01"
+	},
+	{
+		"role": "interviewer",
+		"text": "How do you keep a backend service reliable once it is running in production?",
+		"question_id": "7c1e4a52-3b0d-4f6e-9a21-5d8e6f0b1a02"
+	},
+	{
+		"role": "candidate",
+		"text": "Monitoring is the main thing, so you have metrics and alerts and you see when something goes wrong. Also retries and timeouts between services. That usually works pretty well.",
+		"question_id": "7c1e4a52-3b0d-4f6e-9a21-5d8e6f0b1a02"
+	},
+	{
+		"role": "interviewer",
+		"text": "N26 says its vision is to change the relationship people have with money for the better. Why does that interest you for this role?",
+		"question_id": "7c1e4a52-3b0d-4f6e-9a21-5d8e6f0b1a03"
+	},
+	{
+		"role": "candidate",
+		"text": "I like that goal because a lot of people find banking complicated and an app can make it simpler. I use banking apps every day and I want to work on something people actually use.",
+		"question_id": "7c1e4a52-3b0d-4f6e-9a21-5d8e6f0b1a03"
+	},
+	{
+		"role": "interviewer",
+		"text": "How do you approach testing and code review when a change touches customer money?",
+		"question_id": "7c1e4a52-3b0d-4f6e-9a21-5d8e6f0b1a04"
+	},
+	{
+		"role": "candidate",
+		"text": "I write unit tests and integration tests, and with money I would be extra careful about rounding and about a payment being processed twice. In code review I look at the logic and if the tests make sense.",
+		"question_id": "7c1e4a52-3b0d-4f6e-9a21-5d8e6f0b1a04"
+	},
+	{
+		"role": "interviewer",
+		"text": "Tell me about a time you had to fix a serious problem in a system you worked on.",
+		"question_id": "7c1e4a52-3b0d-4f6e-9a21-5d8e6f0b1a05"
+	},
+	{
+		"role": "candidate",
+		"text": "There was a problem in production once and it was a big issue for the team. We looked at it together and changed some things and after that it was better, so in the end it worked out fine.",
+		"question_id": "7c1e4a52-3b0d-4f6e-9a21-5d8e6f0b1a05"
+	},
+	{
+		"role": "interviewer",
+		"text": "That was the last question, thanks for practicing. Your feedback will be based only on the text of your answers.",
+		"question_id": null
+	}
+]

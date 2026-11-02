@@ -1,0 +1,48 @@
+{
+	"scores": [
+		{
+			"dimension": "star",
+			"score": 4,
+			"evidence_quote": "I traced it to one slow query, added an index and moved the receipts to a queue.",
+			"tip": "Keep this structure and say in one sentence why the result mattered to the customers.",
+			"noise": 0
+		},
+		{
+			"dimension": "relevance",
+			"score": 4,
+			"evidence_quote": "I would add the new column first, write to both columns behind a flag",
+			"tip": "Keep answering directly and link each example to the backend work in the job description.",
+			"noise": 0
+		},
+		{
+			"dimension": "role_knowledge",
+			"score": 4,
+			"evidence_quote": "Each step can be rolled back on its own",
+			"tip": "Name the trade-off you accepted when you explain why you picked a method.",
+			"noise": 0
+		},
+		{
+			"dimension": "company_fit",
+			"score": 3,
+			"evidence_quote": "I thought that was too risky for customer money",
+			"tip": "Connect one of these projects to a specific company fact, such as its vision or its markets.",
+			"noise": 0
+		},
+		{
+			"dimension": "conciseness",
+			"score": 4,
+			"evidence_quote": "We measured it from the CI logs over two months",
+			"tip": "Keep answers this short and add detail only where an example or result needs it.",
+			"noise": 0
+		},
+		{
+			"dimension": "evidence",
+			"score": 4,
+			"evidence_quote": "the failures went down to 0.2 percent and p95 went from 900 to 250 milliseconds",
+			"tip": "Keep giving numbers and add how long the improvement has lasted.",
+			"noise": 0
+		}
+	],
+	"strengths": ["relevance","role_knowledge","conciseness","evidence"],
+	"weakest": ["company_fit","star"]
+}
