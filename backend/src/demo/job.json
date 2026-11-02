@@ -1,0 +1,6 @@
+{
+	"sample": true,
+	"note": "SAMPLE written for this demo. Not a real job posting and not written by or with N26.",
+	"role_title": "Backend Engineer",
+	"job_description": "SAMPLE job description written for a practice demo. Not a real job posting, not written by or with N26.\n\nBackend Engineer, N26, Berlin\n\nWhat you would do\n- Build and run backend services for a mobile banking app\n- Design APIs used by the mobile apps and by other teams\n- Keep services reliable with monitoring, on-call and incident reviews\n- Work with product and security colleagues on regulated features\n\nWhat we look for\n- Experience building backend services in Java, Kotlin or a similar language\n- SQL databases, REST APIs and message queues\n- Testing, code review and safe deployment habits\n- Clear communication in English"
+}

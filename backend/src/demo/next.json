@@ -1,0 +1,29 @@
+{
+	"weak": {
+		"star": [
+			"Tell me about a project where you changed how a backend service worked. What was the situation, what did you do yourself and what was the result?",
+			"Describe a time you disagreed with a technical decision. What was the situation, what did you do and how did it end?"
+		],
+		"relevance": [
+			"What part of this backend role would you take on first, and why?",
+			"Which of your past projects is closest to the work in this job description, and what makes it close?"
+		],
+		"role_knowledge": [
+			"How would you stop a payment from being processed twice when a client retries a request?",
+			"When would you use a message queue instead of a direct API call between two services?"
+		],
+		"company_fit": [
+			"N26 operates in 24 markets worldwide. What would change in your backend work when a product has to serve that many markets?",
+			"N26 is a fully licensed German bank. How would working in a regulated company change the way you build software?"
+		],
+		"conciseness": [
+			"In two or three sentences, what is the most useful thing you built in your last job?",
+			"Explain in under a minute what an idempotent API is, as you would to a colleague from product."
+		],
+		"evidence": [
+			"Which result from your recent work can you back with numbers, and how did you measure it?",
+			"Give a specific example of a change you made that improved a service. What numbers changed?"
+		]
+	},
+	"new": "How would you roll out a risky database change without downtime?"
+}

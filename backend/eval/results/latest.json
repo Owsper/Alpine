@@ -1,0 +1,113 @@
+{
+	"notice": "SMOKE TEST ONLY : labels are synthetic (AI-written, label_source synthetic-ai) and accents are simulated, so this is not fairness validation",
+	"targets": {
+		"kappa": 0.6,
+		"noise": 0.5,
+		"accent_delta": 0.5
+	},
+	"n": {
+		"gold": 2,
+		"accents": 0
+	},
+	"dims": {
+		"star": {
+			"kappa": null,
+			"mae": 0,
+			"noise": 0
+		},
+		"relevance": {
+			"kappa": null,
+			"mae": 0,
+			"noise": 0
+		},
+		"role_knowledge": {
+			"kappa": null,
+			"mae": 0,
+			"noise": 0
+		},
+		"company_fit": {
+			"kappa": null,
+			"mae": 0,
+			"noise": 0
+		},
+		"conciseness": {
+			"kappa": null,
+			"mae": 0,
+			"noise": 0
+		},
+		"evidence": {
+			"kappa": 0,
+			"mae": 0.5,
+			"noise": 0
+		}
+	},
+	"overall": {
+		"kappa": 0,
+		"mae": 0.08333333333333333,
+		"noise": 0
+	},
+	"accents": {},
+	"label_source": "synthetic-ai",
+	"model": "zai-org/GLM-5.3-Flash",
+	"selected": 2,
+	"failed": [],
+	"items": {
+		"gold": [
+			{
+				"id": "g001",
+				"labels": {
+					"star": 5,
+					"relevance": 5,
+					"role_knowledge": 5,
+					"company_fit": 5,
+					"conciseness": 5,
+					"evidence": 5
+				},
+				"pred": {
+					"star": 5,
+					"relevance": 5,
+					"role_knowledge": 5,
+					"company_fit": 5,
+					"conciseness": 5,
+					"evidence": 5
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0,
+					"role_knowledge": 0,
+					"company_fit": 0,
+					"conciseness": 0,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "g002",
+				"labels": {
+					"star": 5,
+					"relevance": 5,
+					"role_knowledge": 5,
+					"company_fit": 5,
+					"conciseness": 5,
+					"evidence": 4
+				},
+				"pred": {
+					"star": 5,
+					"relevance": 5,
+					"role_knowledge": 5,
+					"company_fit": 5,
+					"conciseness": 5,
+					"evidence": 5
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0,
+					"role_knowledge": 0,
+					"company_fit": 0,
+					"conciseness": 0,
+					"evidence": 0
+				}
+			}
+		],
+		"accents": []
+	}
+}

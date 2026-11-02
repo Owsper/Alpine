@@ -1,0 +1,48 @@
+{
+	"scores": [
+		{
+			"dimension": "star",
+			"score": 2,
+			"evidence_quote": "We looked at it together and changed some things and after that it was better",
+			"tip": "Pick one situation, say what you did yourself and finish with the result it had.",
+			"noise": 0
+		},
+		{
+			"dimension": "relevance",
+			"score": 4,
+			"evidence_quote": "I would make a GET endpoint for the payments with pagination",
+			"tip": "Keep opening with the direct answer and link it to the backend work in the job description.",
+			"noise": 0
+		},
+		{
+			"dimension": "role_knowledge",
+			"score": 3,
+			"evidence_quote": "I would use cursor pagination since new payments keep coming in",
+			"tip": "Explain how you would apply each method you name and what the trade-offs are.",
+			"noise": 0
+		},
+		{
+			"dimension": "company_fit",
+			"score": 3,
+			"evidence_quote": "I want to work on something people actually use",
+			"tip": "Connect one project of your own to a specific company fact, such as its vision or product.",
+			"noise": 0
+		},
+		{
+			"dimension": "conciseness",
+			"score": 4,
+			"evidence_quote": "Also retries and timeouts between services.",
+			"tip": "Keep answers this short and add detail only where an example or result needs it.",
+			"noise": 0
+		},
+		{
+			"dimension": "evidence",
+			"score": 2,
+			"evidence_quote": "so in the end it worked out fine",
+			"tip": "Back each claim with a concrete example and a number, such as response times before and after a fix.",
+			"noise": 0
+		}
+	],
+	"strengths": ["relevance","conciseness"],
+	"weakest": ["star","evidence"]
+}
