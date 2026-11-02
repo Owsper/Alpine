@@ -33,12 +33,12 @@ export const config = {
   /** First words are scripted on the client so the AI disclosure is always said (EU AI Act Art. 50). */
   disclosure: "Hi, I'm an AI interviewer.",
   flow: {
-    /** Answers shorter than this get one follow-up question (at most one per question). */
-    followupBelowWords: 8,
+    /** Quiet time after the last piece of speech before the answer counts (on top of vad.endSilenceMs). */
+    answerGraceMs: 1300,
     /** Said before the question when the candidate asks to hear it again. */
     repeatPrefix: 'Of course.',
     /** If the model has not produced a follow-up by then, the interview simply moves on. */
-    followupDeadlineMs: 4000,
+    followupDeadlineMs: 5000,
     /** Neutral on purpose: the interviewer never gives feedback during the interview. */
     acknowledgements: ['Thank you.', 'Got it.', 'Okay, thanks.', 'Understood, thank you.'],
     wrapUp: 'That was the last question. Thank you for your time. Your answers are being saved, and your report will be ready shortly.',

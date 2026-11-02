@@ -164,18 +164,24 @@ export default function Interview() {
           setHearing(true)
         },
         // Barge-in: once it is clearly the candidate talking, the interviewer stops.
-        onConfirmedSpeech: () => out.speaking && out.stop(),
+        onConfirmedSpeech: () => {
+          if (out.speaking) out.stop()
+          flow.onSpeech()
+        },
         onUtterance: (wav) => {
           setHearing(false)
           const startedAt = speechStartedAt
           const endedAt = Date.now()
           transcribe(wav).then(
             (text) => {
-              if (!text) return
+              if (!text) return flow.release()
               setLastAnswer(text)
               void flow.onAnswer(text, startedAt, endedAt)
             },
-            () => setNotice('Speech recognition is unavailable right now. You can type your answer below.'),
+            () => {
+              flow.release()
+              setNotice('Speech recognition is unavailable right now. You can type your answer below.')
+            },
           )
         },
       })
@@ -203,7 +209,7 @@ export default function Interview() {
     setTyped('')
     setLastAnswer(text)
     speaker.current?.stop()
-    void interview.current.onAnswer(text, Date.now(), Date.now())
+    void interview.current.onAnswer(text, Date.now(), Date.now(), true)
   }
 
   function endSession() {

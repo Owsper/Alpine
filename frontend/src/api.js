@@ -17,11 +17,23 @@ async function call(path, { method = 'GET', body } = {}) {
   return data
 }
 
+// Grading runs the model several times, so a second request for the same session (React's dev
+// double effect, a quick re-render) shares the one already in flight instead of grading again.
+const grading = new Map()
+function grade(sessionId) {
+  if (!grading.has(sessionId)) {
+    const request = call('/grade', { method: 'POST', body: { session_id: sessionId } })
+    grading.set(sessionId, request)
+    request.finally(() => grading.delete(sessionId)).catch(() => undefined)
+  }
+  return grading.get(sessionId)
+}
+
 export const api = {
   research: (job) => call('/research', { method: 'POST', body: { company: job.company, role: job.role, description: job.posting } }),
   session: (jobId) => call('/session', { method: 'POST', body: { job_id: jobId } }),
   start: (sessionId) => call(`/session/${sessionId}/start`, { method: 'POST' }),
-  grade: (sessionId) => call('/grade', { method: 'POST', body: { session_id: sessionId } }),
+  grade,
   next: (sessionId) => call('/next', { method: 'POST', body: { session_id: sessionId } }),
   progress: (jobId) => call(`/progress/${jobId}`),
   voiceStatus: () => call('/voice/status'),
