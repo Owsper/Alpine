@@ -1,4 +1,4 @@
-import { ArrowRight, Info } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useFlow } from '../flow.jsx'
@@ -33,7 +33,7 @@ function Field({ name, label, error, as: Control = 'input', ...controlProps }) {
 
 export default function JobPosting() {
   const navigate = useNavigate()
-  const { job, setJobField, completeStep } = useFlow()
+  const { job, setJobField, completeStep, resetInterview } = useFlow()
   const [errors, setErrors] = useState({})
 
   function handleSubmit(event) {
@@ -46,6 +46,7 @@ export default function JobPosting() {
       return
     }
     completeStep(0)
+    resetInterview()
     navigate('/research')
   }
 
@@ -85,10 +86,6 @@ export default function JobPosting() {
           autoComplete="off"
           placeholder="Paste the posting text or a URL…"
         />
-        <p className="note">
-          <Info size={22} strokeWidth={1.5} aria-hidden="true" />
-          We never use your camera. Audio is not stored unless you opt in.
-        </p>
         <button className="btn btn-primary btn-large" type="submit">
           Prepare interview
           <ArrowRight size={20} strokeWidth={1.75} aria-hidden="true" />

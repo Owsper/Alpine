@@ -1,10 +1,8 @@
 import { FileText, Lightbulb, Play, Target, Trophy } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import RadarChart from '../components/RadarChart.jsx'
-import { dimensions } from '../data.js'
+import { averageScore, dimensions, sessionResults } from '../data.js'
 import { useFlow } from '../flow.jsx'
-
-const scores = dimensions.map((d) => ({ name: d.name, score: d.session1 }))
 
 function Highlight({ icon: Icon, label, value, tone }) {
   return (
@@ -21,19 +19,22 @@ function Highlight({ icon: Icon, label, value, tone }) {
 }
 
 export default function Report() {
-  const { completeStep } = useFlow()
+  const { completeStep, interviewsCompleted } = useFlow()
+  const session = Math.max(1, interviewsCompleted)
+  const result = sessionResults[Math.min(session, sessionResults.length) - 1]
+  const scores = dimensions.map((d) => ({ name: d.name, score: d[result.key] }))
 
   return (
     <div className="report">
-      <h1>Session 1 report</h1>
+      <h1>Session {session} report</h1>
       <p className="lede">Review your results, see key feedback, and practice again with a focused interview.</p>
       <section className="card report-summary" aria-label="Summary">
         <div className="overall">
           <p>Overall score</p>
-          <strong>2.5 / 5</strong>
+          <strong>{averageScore(result.key).toFixed(1)} / 5</strong>
         </div>
-        <Highlight icon={Trophy} label="Strongest area" value="Relevance" tone="good" />
-        <Highlight icon={Target} label="Focus next" value="STAR, Evidence" tone="warn" />
+        <Highlight icon={Trophy} label="Strongest area" value={result.strongest} tone="good" />
+        <Highlight icon={Target} label="Focus next" value={result.focus} tone="warn" />
       </section>
       <div className="report-details">
         <section className="card scores">
@@ -46,7 +47,7 @@ export default function Report() {
             <p className="feedback-chip">
               <span>Evidence</span>
               <span aria-hidden="true">·</span>
-              <span>Score 2</span>
+              <span>Score {scores.find((s) => s.name === 'Evidence').score}</span>
             </p>
             <blockquote>“I just kind of picked it up as we went.”</blockquote>
             <div className="feedback-tip">

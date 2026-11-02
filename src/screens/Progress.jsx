@@ -2,15 +2,12 @@ import { Plus } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import Stat from '../components/Stat.jsx'
-import { dimensions } from '../data.js'
+import { averageScore, dimensions, sessionResults } from '../data.js'
 import { useFlow } from '../flow.jsx'
+import { buildReportPdf, downloadPdf } from '../reportPdf.js'
 
 function formatDelta(delta) {
   return delta > 0 ? `+${delta}` : String(delta)
-}
-
-function average(key) {
-  return dimensions.reduce((sum, d) => sum + d[key], 0) / dimensions.length
 }
 
 function ScoreBar({ label, score, className, from }) {
@@ -27,9 +24,37 @@ function ScoreBar({ label, score, className, from }) {
 
 export default function Progress() {
   const navigate = useNavigate()
-  const { startNewPosition } = useFlow()
+  const { job, startNewPosition, resetInterview, interviewsCompleted } = useFlow()
+  // A comparison needs two finished interviews. Until then only the first one is shown.
+  const latest = Math.max(1, interviewsCompleted)
+  const comparing = latest > 1
+  const previous = comparing ? latest - 1 : 1
+  const firstAverage = averageScore('session1')
+  const secondAverage = averageScore('session2')
   const dialogRef = useRef(null)
   const [saveFailed, setSaveFailed] = useState(false)
+
+  function downloadReport() {
+    const result = sessionResults[Math.min(latest, sessionResults.length) - 1]
+    const pdf = buildReportPdf({
+      job,
+      date: new Date().toLocaleDateString('en-US', { dateStyle: 'long' }),
+      title: comparing ? `Progress: session ${previous} vs session ${latest}` : 'Progress: session 1',
+      stats: comparing
+        ? [
+            { label: `Session ${previous}`, value: firstAverage.toFixed(1) },
+            { label: `Session ${latest}`, value: secondAverage.toFixed(1) },
+            { label: 'Change', value: `+${(secondAverage - firstAverage).toFixed(1)}`, good: true },
+          ]
+        : [{ label: 'Session 1', value: firstAverage.toFixed(1) }],
+      rows: dimensions.map((d) => ({ name: d.name, before: d.session1, after: comparing ? d.session2 : undefined })),
+      previous,
+      latest,
+      strongest: result.strongest,
+      focus: result.focus,
+    })
+    downloadPdf(pdf, job.company)
+  }
 
   function openConfirm() {
     setSaveFailed(false)
@@ -37,7 +62,11 @@ export default function Progress() {
   }
 
   function confirmNewPosition() {
-    const saved = startNewPosition({ session1: average('session1'), session2: average('session2'), dimensions })
+    const saved = startNewPosition(
+      comparing
+        ? { interviewsCompleted: latest, session1: firstAverage, session2: secondAverage, dimensions }
+        : { interviewsCompleted: latest, session1: firstAverage, dimensions: dimensions.map(({ name, session1 }) => ({ name, session1 })) },
+    )
     if (!saved) {
       setSaveFailed(true)
       return
@@ -48,12 +77,20 @@ export default function Progress() {
 
   return (
     <div className="page progress">
-      <h1>Progress: session 1 vs session 2</h1>
-      <p className="lede">See how your second interview improved after targeted practice.</p>
+      <h1>{comparing ? `Progress: session ${previous} vs session ${latest}` : 'Progress: session 1'}</h1>
+      <p className="lede">
+        {comparing
+          ? `See how your ${latest === 2 ? 'second' : 'latest'} interview improved after targeted practice.`
+          : 'Finish your next interview to see how your scores change.'}
+      </p>
       <div className="stats">
-        <Stat label="Session 1" value="2.5" />
-        <Stat label="Session 2" value="3.5" />
-        <Stat label="Change" value="+1.0" tone="good" />
+        <Stat label={`Session ${previous}`} value={firstAverage.toFixed(1)} />
+        {comparing && (
+          <>
+            <Stat label={`Session ${latest}`} value={secondAverage.toFixed(1)} />
+            <Stat label="Change" value={`+${(secondAverage - firstAverage).toFixed(1)}`} tone="good" />
+          </>
+        )}
       </div>
       <section className="card compare" aria-labelledby="compare-title">
         <div className="compare-header">
@@ -61,12 +98,14 @@ export default function Progress() {
           <ul className="legend">
             <li>
               <span className="swatch before" aria-hidden="true" />
-              Interview 1 (session 1)
+              Interview {previous} (session {previous})
             </li>
-            <li>
-              <span className="swatch after" aria-hidden="true" />
-              Interview 2 (session 2)
-            </li>
+            {comparing && (
+              <li>
+                <span className="swatch after" aria-hidden="true" />
+                Interview {latest} (session {latest})
+              </li>
+            )}
           </ul>
         </div>
         <table className="compare-table">
@@ -74,11 +113,13 @@ export default function Progress() {
             <tr>
               <th scope="col">Dimension</th>
               <th scope="col" className="comparison-heading">
-                Comparison (score out of 5)
+                {comparing ? 'Comparison (score out of 5)' : 'Score out of 5'}
               </th>
-              <th scope="col" className="improvement-heading">
-                Improvement
-              </th>
+              {comparing && (
+                <th scope="col" className="improvement-heading">
+                  Improvement
+                </th>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -89,13 +130,17 @@ export default function Progress() {
                   <th scope="row">{d.name}</th>
                   <td>
                     <div className="comparison">
-                      <ScoreBar label="Interview 1" score={d.session1} className="before" />
-                      <ScoreBar label="Interview 2" score={d.session2} className="after" from={d.session1 / d.session2} />
+                      <ScoreBar label={`Interview ${previous}`} score={d.session1} className="before" />
+                      {comparing && (
+                        <ScoreBar label={`Interview ${latest}`} score={d.session2} className="after" from={d.session1 / d.session2} />
+                      )}
                     </div>
                   </td>
-                  <td className="improvement">
-                    <span className={delta === 0 ? 'delta flat' : 'delta'}>{formatDelta(delta)}</span>
-                  </td>
+                  {comparing && (
+                    <td className="improvement">
+                      <span className={delta === 0 ? 'delta flat' : 'delta'}>{formatDelta(delta)}</span>
+                    </td>
+                  )}
                 </tr>
               )
             })}
@@ -103,10 +148,10 @@ export default function Progress() {
         </table>
       </section>
       <div className="actions">
-        <Link className="btn btn-primary" to="/interview">
+        <Link className="btn btn-primary" to="/interview" onClick={resetInterview}>
           Start next interview
         </Link>
-        <button className="btn" type="button">
+        <button className="btn" type="button" onClick={downloadReport}>
           Download report
         </button>
         <button className="btn btn-text" type="button" onClick={openConfirm}>
