@@ -5,7 +5,7 @@ import type {DimScore,Fact,Progress,Question,Score,Session,Turn} from './contrac
 import type {Deps} from './deps'
 import {ApiErr} from './errors'
 import {type Llm,withDeadline} from './llm'
-import {BANNED} from './text'
+import {BANNED,HAS_TEXT,hasAnswers} from './text'
 
 export type GradeRun = {scores:Omit<DimScore,'noise'>[]}
 export type GradeInput = {description:string,facts:Fact[],questions:Question[],turns:Turn[]}
@@ -20,7 +20,6 @@ const ATTEMPTS = 3
 const MIN_QUOTE_WORDS = 2
 // reasoning eats the budget : glm hit 13k without the "work quickly" line, up to 7.5k with it
 const MAX_TOKENS = 12000
-const HAS_TEXT = /[\p{L}\p{N}]/u
 
 const Body = z.object({session_id:Id})
 
@@ -218,7 +217,7 @@ export function gradeRoutes(deps:Deps) {
 		const lost = unreleased.get(id)
 		if (lost) await release(id,lost)
 		const turns = s.transcript ?? []
-		if (!turns.some((t) => t.role === 'candidate' && HAS_TEXT.test(t.text))) throw new ApiErr('no_candidate_answers','transcript has no candidate answers')
+		if (!hasAnswers(turns)) throw new ApiErr('no_candidate_answers','transcript has no candidate answers')
 		const claim = deps.now()
 		if (!await store.claimGrading(id,LEASE_MS,claim)) throw new ApiErr('grading_in_progress','grading is already running')
 

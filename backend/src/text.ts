@@ -2,6 +2,10 @@ const UNSTORABLE = /\0|[\uD800-\uDFFF]/gu
 
 export const okText = (s:string) => s.search(UNSTORABLE) < 0
 
+export const HAS_TEXT = /[\p{L}\p{N}]/u
+
+export const hasAnswers = (turns:{role:string,text:string}[]) => turns.some((t) => t.role === 'candidate' && HAS_TEXT.test(t.text))
+
 export const clean = (s:string,max:number) => s.replace(/\s+/g,' ').trim().slice(0,max).replace(UNSTORABLE,'').trim()
 
 export const DISCLAIMER = 'Practice tool. Not affiliated with any company mentioned. No guarantee of job offers.'

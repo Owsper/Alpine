@@ -3,7 +3,7 @@ import {createServer as tcpServer,type AddressInfo,type Socket} from 'node:net'
 import {afterAll,afterEach,beforeAll,beforeEach,describe,expect,it,vi} from 'vitest'
 import {z} from 'zod'
 import {ApiErr} from '../src/errors'
-import {createLlm} from '../src/llm'
+import {createLlm,llmClient} from '../src/llm'
 import {fakeLlm,testEnv} from './helpers'
 
 type Reply = {status?:number,body?:unknown,raw?:string,hang?:'headers'|'body'}
@@ -337,6 +337,107 @@ describe('daily cap',() => {
 		vi.setSystemTime(new Date('2026-01-02T00:00:01Z'))
 		await expect(ask(l)).resolves.toEqual({ok:true})
 	})
+})
+
+describe('budget-1 : a client share',() => {
+	const as = (who:string,l:ReturnType<typeof llm>) => llmClient.run(who,() => ask(l))
+	const three = () => llm({LLM_DAILY_CALL_CAP:15})
+
+	it('stops a client at its share and leaves the other clients alone',async () => {
+		const l = three()
+		replies = [ok('{"ok":true}'),ok('{"ok":true}'),ok('{"ok":true}'),ok('{"ok":true}')]
+		for (let i = 0; i < 3; i++) await as('a',l)
+		expect((await errOf(as('a',l))).code).toBe('budget_exceeded')
+		await expect(as('b',l)).resolves.toEqual({ok:true})
+	})
+
+	it('5xx does not count, so a client that retried an outage still works after it',async () => {
+		const l = three()
+		replies = Array.from({length:6},() => fail(500))
+		for (let i = 0; i < 3; i++) expect((await errOf(as('a',l))).code).toBe('llm_unavailable')
+		replies = [ok('{"ok":true}')]
+		await expect(as('a',l)).resolves.toEqual({ok:true})
+	})
+
+	it('a refused connection does not count',async () => {
+		const dead = createServer()
+		await new Promise<void>((done) => dead.listen(0,'127.0.0.1',done))
+		const port = (dead.address() as AddressInfo).port
+		await new Promise((done) => dead.close(done))
+		const l = llm({LLM_DAILY_CALL_CAP:15,LLM_BASE_URL:'http://127.0.0.1:' + port})
+		for (let i = 0; i < 3; i++) expect((await errOf(as('a',l))).code).toBe('llm_unavailable')
+		expect((await errOf(as('a',l))).code).toBe('llm_unavailable')
+	})
+
+	it('a reply with junk does count, it cost money',async () => {
+		const l = three()
+		replies = [ok('nope'),ok('nope'),ok('nope'),ok('{"ok":true}')]
+		expect((await errOf(as('a',l))).code).toBe('llm_bad_output')
+		expect((await errOf(as('a',l))).code).toBe('budget_exceeded')
+		expect(seen).toHaveLength(3)
+	})
+
+	it('a cut off reply does count',async () => {
+		const l = three()
+		replies = [ok('{"ok":',"length"),ok('{"ok":',"length"),ok('{"ok":true}')]
+		expect((await errOf(as('a',l))).code).toBe('llm_bad_output')
+		await expect(as('a',l)).resolves.toEqual({ok:true})
+		replies = [ok('{"ok":true}')]
+		expect((await errOf(as('a',l))).code).toBe('budget_exceeded')
+	})
+
+	it('failures still count against the global cap',async () => {
+		const l = llm({LLM_DAILY_CALL_CAP:3})
+		replies = [fail(500),fail(500),ok('{"ok":true}')]
+		expect((await errOf(as('a',l))).code).toBe('llm_unavailable')
+		await expect(as('a',l)).resolves.toEqual({ok:true})
+		expect((await errOf(as('b',l))).code).toBe('budget_exceeded')
+	})
+
+	it('is never smaller than one grading round',async () => {
+		const l = llm({LLM_DAILY_CALL_CAP:5})
+		replies = [ok('{"ok":true}'),ok('{"ok":true}'),ok('{"ok":true}')]
+		for (let i = 0; i < 3; i++) await expect(as('a',l)).resolves.toEqual({ok:true})
+	})
+
+	it('resets on the next utc day',async () => {
+		vi.useFakeTimers({toFake:['Date']})
+		vi.setSystemTime(new Date('2026-01-01T23:59:00Z'))
+		const l = three()
+		replies = Array.from({length:4},() => ok('{"ok":true}'))
+		for (let i = 0; i < 3; i++) await as('a',l)
+		expect((await errOf(as('a',l))).code).toBe('budget_exceeded')
+		vi.setSystemTime(new Date('2026-01-02T00:00:01Z'))
+		await expect(as('a',l)).resolves.toEqual({ok:true})
+	})
+
+	it('an aborted call spends nothing',async () => {
+		const l = llm({LLM_DAILY_CALL_CAP:1})
+		const ac = new AbortController()
+		ac.abort()
+		const call = llmClient.run('a',() => l.json({name:'t',schema:Out,system:'s',user:'u',signal:ac.signal}))
+		expect((await errOf(call)).code).toBe('llm_timeout')
+		replies = [ok('{"ok":true}')]
+		await expect(as('a',l)).resolves.toEqual({ok:true})
+	})
+
+	it('a stalled connect spends once however often it retries',async () => {
+		const socks:Socket[] = []
+		const srv = tcpServer(s => {
+			socks.push(s)
+			s.on('error',() => {})
+		})
+		await new Promise<void>(r => srv.listen(0,'127.0.0.1',r))
+		const url = 'https://127.0.0.1:' + (srv.address() as AddressInfo).port
+		const l = createLlm({...testEnv,LLM_BASE_URL:url,LLM_DAILY_CALL_CAP:1},50)
+		try {
+			expect((await errOf(l.json({name:'t',schema:Out,system:'s',user:'u'}))).code).toBe('budget_exceeded')
+			expect(socks.length).toBe(4)
+		} finally {
+			socks.forEach(s => s.destroy())
+			srv.close()
+		}
+	},15000)
 })
 
 describe('fakeLlm',() => {

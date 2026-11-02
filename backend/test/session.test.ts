@@ -233,7 +233,7 @@ describe('POST /session',() => {
 })
 
 describe('flow and instructions',() => {
-	it('says in the intro that this is an AI, practice only, unaffiliated, transcript only',async () => {
+	it('says in the intro that this is an AI, practice only, unaffiliated, and what is saved',async () => {
 		const {s} = await setup()
 		const intro = s.flow[0]
 		expect(intro.type).toBe('intro')
@@ -241,8 +241,9 @@ describe('flow and instructions',() => {
 		expect(intro.text).toContain('I am an AI interviewer')
 		expect(intro.text).toMatch(/practice only/)
 		expect(intro.text).toMatch(/not affiliated/)
-		expect(intro.text).toMatch(/transcript/)
-		expect(intro.text).toMatch(/no audio/)
+		expect(intro.text).not.toMatch(/only the text transcript/i)
+		for (const saved of ['transcript','questions','scores','job description','no audio']) expect(intro.text).toContain(saved)
+		expect(s.interviewer_instructions).toContain(intro.text)
 	})
 
 	it('keeps model output out of the disclosure, the company goes in the data block',async () => {
@@ -412,11 +413,89 @@ describe('POST /session/:id/transcript',() => {
 		const {app,s,store} = await setup()
 		await post(app,`/session/${s.id}/start`,{})
 		await save(app,s.id,turns)
-		const next:Turn[] = [{role:'candidate',text:'only this now'}]
+		const next = turns.map((t):Turn => ({...t,text:t.text + ' edited'}))
 		const res = await save(app,s.id,next)
 		expect((await res.json()).transcript).toEqual(next)
 		expect((await store.getSession(s.id))?.transcript).toEqual(next)
 		expect((await store.getSession(s.id))?.status).toBe('in_progress')
+	})
+
+	it('a longer partial save replaces',async () => {
+		const {app,s,store} = await setup()
+		await save(app,s.id,turns)
+		const next = [...turns,{role:'candidate',text:'and one more thing'} as Turn]
+		expect((await save(app,s.id,next)).status).toBe(200)
+		expect((await store.getSession(s.id))?.transcript).toEqual(next)
+	})
+
+	it.each([false,true])('fewer turns than stored with final %s gets invalid_state and changes nothing',async (final) => {
+		const {app,s,store} = await setup()
+		await save(app,s.id,turns)
+		const before = await store.getSession(s.id)
+		for (const fewer of [turns.slice(0,-1),[]]) {
+			const e = await errOf(await save(app,s.id,fewer,final),409,'invalid_state')
+			expect(e.details).toEqual({stored_turns:turns.length})
+		}
+		expect(await store.getSession(s.id)).toEqual(before)
+	})
+
+	it('names the stored turns on a frozen session too, and the full resend still works',async () => {
+		const {app,s,store} = await setup()
+		const done = await save(app,s.id,turns,true).then((r) => r.json())
+		const e = await errOf(await save(app,s.id,turns.slice(0,1),true),409,'invalid_state')
+		expect(e.details).toEqual({stored_turns:turns.length})
+		expect(await save(app,s.id,turns,true).then((r) => r.json())).toEqual(done)
+		expect((await store.getSession(s.id))?.status).toBe('completed')
+	})
+
+	const NO_ANSWER:[string,Turn[]][] = [
+		['no turns',[]],
+		['interviewer only',[{role:'interviewer',text:'Hello?'}]],
+		['a blank candidate',[{role:'interviewer',text:'Hello?'},{role:'candidate',text:'  \n'}]],
+		['punctuation only',[{role:'candidate',text:'...'}]],
+		['an emoji only',[{role:'candidate',text:'🙂'}]],
+	]
+
+	it.each(NO_ANSWER)('final with %s gets no_candidate_answers on an in_progress session and changes nothing',async (name,t) => {
+		const {app,s,store} = await setup()
+		await post(app,`/session/${s.id}/start`,{})
+		const before = await store.getSession(s.id)
+		const e = await errOf(await save(app,s.id,t,true),422,'no_candidate_answers')
+		expect(e.retryable).toBe(false)
+		expect(await store.getSession(s.id)).toEqual(before)
+		expect(before?.status).toBe('in_progress')
+	})
+
+	it('final with no answers keeps a stored partial and a created session as they are',async () => {
+		const {app,s,store} = await setup()
+		await errOf(await save(app,s.id,[{role:'interviewer',text:'Hello?'}],true),422,'no_candidate_answers')
+		expect(await store.getSession(s.id)).toMatchObject({status:'created',transcript:null})
+
+		const stored:Turn[] = [{role:'interviewer',text:'Hello?'}]
+		await save(app,s.id,stored)
+		await errOf(await save(app,s.id,[{role:'interviewer',text:'Hello again?'}],true),422,'no_candidate_answers')
+		expect(await store.getSession(s.id)).toMatchObject({status:'in_progress',transcript:stored})
+		expect((await save(app,s.id,[...stored,{role:'candidate',text:'Hi there'}],true).then((r) => r.json())).status).toBe('completed')
+	})
+
+	it('a partial save with no answers is still fine',async () => {
+		const {app,s} = await setup()
+		expect((await save(app,s.id,[{role:'interviewer',text:'Hello?'}])).status).toBe(200)
+	})
+
+	it.each(NO_ANSWER)('/grade agrees on %s',async (name,t) => {
+		const {app,s,store} = await setup()
+		await store.saveTranscript(s.id,['created'],t,'completed')
+		await errOf(await post(app,'/grade',{session_id:s.id}),422,'no_candidate_answers')
+	})
+
+	it('both routes take a digit as candidate text',async () => {
+		const t:Turn[] = [{role:'candidate',text:'42'}]
+		const {app,s} = await setup({llm:fakeLlm({session:(c) => firstOrLater(c,2),grade:() => {
+			throw new ApiErr('llm_unavailable','down')
+		}})})
+		expect((await save(app,s.id,t,true)).status).toBe(200)
+		await errOf(await post(app,'/grade',{session_id:s.id}),503,'llm_unavailable')
 	})
 
 	it('moves to completed on final from in_progress or created',async () => {
@@ -464,8 +543,15 @@ describe('POST /session/:id/transcript',() => {
 		const {app,s} = await setup()
 		const many = Array.from({length:300},():Turn => ({role:'candidate',text:'hi'}))
 		expect((await save(app,s.id,many).then((r) => r.json())).transcript).toHaveLength(300)
+		const other = await setup()
 		const big:Turn[] = [{role:'candidate',text:'x'.repeat(30000)},{role:'interviewer',text:'y'.repeat(30000)}]
-		expect((await save(app,s.id,big).then((r) => r.json())).transcript).toEqual(big)
+		expect((await save(other.app,other.s.id,big).then((r) => r.json())).transcript).toEqual(big)
+	})
+
+	it('two identical finals at once both get 200',async () => {
+		const {app,s} = await setup()
+		const both = await Promise.all([save(app,s.id,turns,true),save(app,s.id,turns,true)])
+		expect(both.map((r) => r.status)).toEqual([200,200])
 	})
 
 	it.each([

@@ -39,7 +39,7 @@ Measured on 2026-11-02 against the real relay on the memory store. These are two
 
 | Call | Time |
 | --- | --- |
-| `POST /research`, first time for a company | 12.0 s and 10.9 s |
+| `POST /research`, first time for a company | 4 to 23 s over 15 job descriptions. Each site that gives no facts adds an LLM call, at most 4 sites are tried |
 | `POST /research`, facts cached | 13.0 s (the company name is still extracted by the LLM) |
 | `POST /session` | 13.0 s, 23.0 s and 13.1 s |
 | `POST /grade` | 16.6 s, 29.3 s and 36.9 s |
@@ -47,7 +47,7 @@ Measured on 2026-11-02 against the real relay on the memory store. These are two
 | `POST /next` | 19.3 s and 39.6 s |
 | `POST /next`, plan already exists | 2 ms |
 
-If the client gives up on `/grade`, for example after a reload, the server keeps grading. To wait for it poll `GET /session/:id` every few seconds until `status` is `graded`, it has no rate limit and it returns the score. Do not poll `POST /grade` : it counts against the limit of 10 per minute, so a poll every 3 s gets `rate_limited` at about 30 s, right when a slow grade finishes.
+If the client gives up on `/grade`, for example after a reload, the server keeps grading. To wait for it poll `GET /session/:id` every few seconds until `status` is `graded`, it has no rate limit and it returns the score. While polling, `status` `completed` with `grading_started_at` null means no grade is running any more, because it failed : stop polling and call `POST /grade` again or show the error. Do not poll `POST /grade` : it counts against the limit of 10 per minute, so a poll every 3 s gets `rate_limited` at about 30 s, right when a slow grade finishes.
 
 ## Anonymous user_id
 
@@ -102,15 +102,15 @@ What each call does per status :
 | Call | created | in_progress | completed | graded |
 | --- | --- | --- | --- | --- |
 | `start` | moves to in_progress | 200, no change | `invalid_state` | `invalid_state` |
-| `transcript`, `final:false` | saves, moves to in_progress | saves | 200 if turns are identical, else `invalid_state` | same as completed |
-| `transcript`, `final:true` | saves, moves to completed | saves, moves to completed | 200 if turns are identical, else `invalid_state` | same as completed |
+| `transcript`, `final:false` | saves, moves to in_progress | saves, `invalid_state` if it has fewer turns than stored | 200 if turns are identical, else `invalid_state` | same as completed |
+| `transcript`, `final:true` | saves, moves to completed, `no_candidate_answers` if it has no candidate text | saves, moves to completed, `invalid_state` if it has fewer turns than stored, `no_candidate_answers` if it has no candidate text | 200 if turns are identical, else `invalid_state` | same as completed |
 | `grade` | `invalid_state` | `invalid_state` | grades, moves to graded | returns the stored score |
 | `next` | `invalid_state` | `invalid_state` | `invalid_state`, unless a score is stored : then it moves to graded and continues | creates the plan, or returns the stored one |
 
 Notes :
 
 - `start` is optional, a transcript can be saved straight from `created`.
-- The transcript is frozen once it is final. **Do not send `final:true` before the candidate has answered** : a final transcript with no candidate text gets `no_candidate_answers` on every `/grade` and the session can't be graded. Create a new session in that case.
+- The transcript is frozen once it is final. A `final:true` with no candidate text gets `no_candidate_answers` and changes nothing, so the session stays open and the interview can go on.
 - `/grade` and `/next` are safe to retry : they never grade twice or plan twice. If grading fails, the session stays `completed` so a retry works. A grade run stops by itself after 4.5 minutes. One that dies without finishing (a server crash for example) blocks retries with `grading_in_progress` for up to 5 minutes.
 - `/research` and `/session` are **not** idempotent. Each successful call makes a new job or session, so retry them only after an error.
 
@@ -132,7 +132,7 @@ type Score = {session_id,scores:DimScore[],strengths:Dim[],weakest:[Dim,Dim],pro
 type Plan = {id,session_id,next_session_id,weakest:[Dim,Dim],composition:{weak:3,anchor:1,new:1},created_at}
 ```
 
-Untyped fields are strings. `grading_started_at` is internal, the UI can ignore it. Sessions in the export also carry `user_id`.
+Untyped fields are strings. `grading_started_at` is set while a grade runs and null otherwise, a poller uses it to see that a grade has stopped, see [Timing](#timing). Sessions in the export also carry `user_id`.
 
 The six dimensions, from the grader's rubric :
 
@@ -165,7 +165,7 @@ Finds the company and its sourced facts, and creates the job.
 | --- | --- | --- |
 | `user_id` | uuid | required |
 | `job_description` | string | required, 1 to 20000 chars |
-| `company_url` | http(s) url | optional, wins over any url found in the description and is taken as given |
+| `company_url` | http(s) url | optional, wins over any url found in the description and is taken as given. Omit it when the field is blank and add `https://` when the user typed no scheme : `''` and `acme.test` get `bad_request`, not `source_not_allowed` |
 | `demo` | boolean | optional, only has an effect when the server runs in demo mode |
 
 Request :
@@ -195,8 +195,8 @@ Response :
 	},
 	"company":{"name":"Acme Robotics","url":"https://acme.test/"},
 	"facts":[
-		{"claim":"Acme builds warehouse robots.","source_url":"https://acme.test/","retrieved_at":"2026-11-02T14:27:06.627Z"},
-		{"claim":"Acme was founded in 2011.","source_url":"https://acme.test/about","retrieved_at":"2026-11-02T14:27:07.281Z"}
+		{"claim":"Acme builds warehouse robots for mid-sized retailers across Europe.","source_url":"https://acme.test/","retrieved_at":"2026-11-02T14:27:06.627Z"},
+		{"claim":"We were founded in Graz in 2011 and now employ 340 people.","source_url":"https://acme.test/about","retrieved_at":"2026-11-02T14:27:07.281Z"}
 	],
 	"cached":false,
 	"warnings":[],
@@ -204,8 +204,10 @@ Response :
 }
 ```
 
-- `facts` has at most 8 items, and every one comes from a fetched page of the company. Facts whose supporting quote is not on that page are dropped by code.
-- Without `company_url` the server looks at links in the description (the first 3 hosts), then at a homepage the model suggests. One only counts if the description names a company and that company's name is on its home page. ATS and job board hosts such as Greenhouse, Lever, Workable or StepStone never count. To be sure of the right site, send `company_url`.
+- `facts` has at most 8 items, and every one comes from a fetched page of the company.
+- `claim` is **a sentence copied from that page**, not a summary, so it can say "we". Only whitespace is changed. Code checks it against the page text ignoring case and quote style, so those can differ from the page. A sentence that is not on the page, has under 4 words or is over 300 chars is dropped, so there can be fewer than 8. Text the reader can't see never counts : `script`, `style`, `noscript`, `template`, `svg`, `nav`, `footer` and elements with the `hidden` attribute, `aria-hidden="true"` or an inline `display:none` or `visibility:hidden`. Content that React streaming moves into place from a `hidden` segment is visible, so it counts. CSS classes are not read.
+- Without `company_url` the server tries up to 4 sites from the links in the description (3 hosts at most) and the sites the model suggests, and the description has to name a company. A host that matches the company name comes first, like `bosch.com` for Robert Bosch GmbH or `corporate.zalando.com` for Zalando SE, and it only needs a readable home page. Any other host needs the company's name on its home page, and is only used when no matching host could be read : a tool or partner the description links to can name the company too. When a site gives no facts the next one is tried, and the first that could be read is what `company.url` shows if none has facts. ATS and job board hosts such as Greenhouse, Lever, Workable or StepStone never count, unless that is the company hiring and its name is on the home page. To be sure of the right site, send `company_url`.
+- A page that redirects away from the path that was asked for is dropped, like `/about` landing on `/efood`, because it can be about a brand or a subsidiary. Staying on that word is fine, like `/about` landing on `/en-eu/about`.
 - `company.name` and `company.url` can be null.
 - `cached` is true when the facts came from the 7 day cache of that company on that host (or the demo data). `retrieved_at` then keeps the original fetch time.
 - `warnings` can hold `no_official_source` (no usable company url) and `no_sourced_facts` (no page could be fetched, or no fact could be verified). In both cases `facts` is empty and the call still returns 200, the job is usable.
@@ -245,7 +247,7 @@ Response, a Session. `interviewer_instructions` is shortened here :
 		{"id":"a1b2c3d4-0003-4a00-8a00-000000000005","text":"What draws you to this role at Acme Robotics?","kind":"base","dimension":null}
 	],
 	"flow":[
-		{"type":"intro","text":"I am an AI interviewer, not a human. This is practice only, it is not part of any hiring or selection process, and I am not affiliated with any company mentioned. Only the text transcript of this session is saved, no audio is stored.","question_id":null},
+		{"type":"intro","text":"I am an AI interviewer, not a human. This is practice only, it is not part of any hiring or selection process, and I am not affiliated with any company mentioned. The text transcript of this session is saved with its questions, scores and the job description, no audio is stored.","question_id":null},
 		{"type":"question","text":"How do you approach API design so it stays dependable for everyone who consumes it?","question_id":"a1b2c3d4-0003-4a00-8a00-000000000001"},
 		{"type":"question","text":"How do you keep a backend service reliable once it is running in production?","question_id":"a1b2c3d4-0003-4a00-8a00-000000000002"},
 		{"type":"question","text":"Can you describe a backend service you built and how you made sure it was well tested?","question_id":"a1b2c3d4-0003-4a00-8a00-000000000003"},
@@ -294,8 +296,11 @@ Errors : `bad_request`, `not_found`, `invalid_state`.
 
 ### POST /session/:id/transcript
 
-Saves the transcript. Every call **replaces** the stored one, so always send all the turns so far. Save partial transcripts during the interview so a dropped connection loses little, then send the full one with `final:true`.
+Saves the transcript. Every accepted call **replaces** the stored one, so always send all the turns so far. Save partial transcripts during the interview so a dropped connection loses little, then send the full one with `final:true`.
 
+- **Fewer turns than stored** : a partial or final save with fewer turns than are stored gets `invalid_state` with `details.stored_turns`, and nothing is stored. It is a late or stale save : resend the full transcript. The same number of turns or more replaces, so a turn can be corrected but not removed. Two saves that overlap can still both pass this check, so wait for each save to answer before sending the next.
+- **After a reload** : take the turns from `session.transcript` (null means none) in `GET /session/:id` and add to those, before any save. A list that restarted from empty gets `invalid_state` while it is shorter, and **silently replaces the earlier answers** once it reaches the stored length.
+- **No candidate text** : `final:true` with no letter or digit in any candidate turn gets `no_candidate_answers`. The status and the stored transcript stay as they were. `/grade` uses the same check.
 - `turns` : array of Turn, in order. A Turn accepts only `role`, `text` and `question_id`. Anything else is `bad_request`.
 - `question_id` : the id from the `flow` step being asked or answered, when known. Optional.
 - Limits : 300 turns and 60000 chars of text in total, else `transcript_too_long`. Nothing is ever truncated silently.
@@ -324,7 +329,7 @@ Response, the Session :
 }
 ```
 
-Errors : `bad_request` (`details` names a turn with characters that can't be stored : a NUL or half an emoji), `not_found`, `invalid_state`, `transcript_too_long`, `payload_too_large`.
+Errors : `bad_request` (`details` names a turn with characters that can't be stored : a NUL or half an emoji), `not_found`, `invalid_state`, `no_candidate_answers`, `transcript_too_long`, `payload_too_large`.
 
 ### POST /grade
 
@@ -425,7 +430,7 @@ Returns everything stored for the user. Each fact also carries its `job_id`. An 
 ```jsonc
 {
 	"jobs":[/* Job */],
-	"facts":[{"claim":"Acme builds warehouse robots.","source_url":"https://acme.test/","retrieved_at":"2026-11-02T14:27:06.627Z","job_id":"a1b2c3d4-0001-4a00-8a00-000000000001"}],
+	"facts":[{"claim":"Acme builds warehouse robots for mid-sized retailers across Europe.","source_url":"https://acme.test/","retrieved_at":"2026-11-02T14:27:06.627Z","job_id":"a1b2c3d4-0001-4a00-8a00-000000000001"}],
 	"sessions":[/* Session, with transcript */],
 	"scores":[/* Score */],
 	"plans":[/* Plan */]
@@ -481,16 +486,16 @@ Every failure has this shape. `details` is optional. Show `message` to developer
 | --- | --- | --- | --- | --- |
 | `bad_request` | 400 | no | Invalid body, id or JSON. `details` lists the problems | Fix the request |
 | `not_found` | 404 | no | No such route, session or job | Stop |
-| `invalid_state` | 409 | no | Not allowed in this session status | Reload with `GET /session/:id` |
+| `invalid_state` | 409 | no | Not allowed in this session status, or a transcript with fewer turns than stored. `details.stored_turns` has the count then | Reload with `GET /session/:id`. For fewer turns, take the full list from `session.transcript`, add the new turns and resend |
 | `session_conflict` | 409 | yes | Too many sessions created at once on this job | Retry with backoff |
-| `grading_in_progress` | 409 | yes | Another `/grade` is running for this session | Poll `GET /session/:id` until `graded` |
+| `grading_in_progress` | 409 | yes | Another `/grade` is running for this session | Poll `GET /session/:id` until `graded`, or until `grading_started_at` is null while still `completed`, then call `/grade` again |
 | `payload_too_large` | 413 | no | Body over 256 KB | Do not retry as is |
 | `transcript_too_long` | 413 | no | Over 300 turns or 60000 chars. `details` has the counts | Do not retry as is |
 | `unsupported_media_type` | 415 | no | POST body without `content-type: application/json` | Fix the request |
-| `no_candidate_answers` | 422 | no | Final transcript has no candidate text | Start a new session |
+| `no_candidate_answers` | 422 | no | Final transcript has no candidate text. Nothing was saved | Keep interviewing, send `final:true` after an answer |
 | `source_not_allowed` | 422 | no | `company_url` can't be used. `details.reason` says why | Ask for another url, or send none |
 | `rate_limited` | 429 | yes | Too many requests | Wait for `Retry-After` |
-| `budget_exceeded` | 429 | no | Daily LLM call cap or this client's share of it (a fifth) reached, resets at 00:00 UTC | Ask to come back later |
+| `budget_exceeded` | 429 | no | Daily LLM call cap or this client's share of it (a fifth) reached, resets at 00:00 UTC. Calls the provider did not answer do not count against the share, so retrying through an outage does not use it up | Ask to come back later |
 | `llm_rate_limited` | 429 | yes | The LLM provider is rate limiting | Retry with backoff |
 | `internal` | 500 | no | Unexpected server error, the message is generic | Show a generic error |
 | `llm_bad_output` | 502 | yes | The LLM kept returning invalid output | Retry with backoff |
@@ -503,11 +508,11 @@ Every failure has this shape. `details` is optional. Show `message` to developer
 
 ## Demo mode
 
-For a reliable demo when the server runs with `DEMO_MODE=1`. Send `demo:true` to `/research`, or to `/session` with a `job_description`, and use the `job_description` and transcripts from `GET /demo`. With a `job_id` the flag is accepted and ignored, the job already knows. The server uses the memory store in this mode, so no step needs a database or the network.
+For a reliable demo when the server runs with `DEMO_MODE=1`, which needs no relay key. Send `demo:true` to `/research`, or to `/session` with a `job_description`, and use the `job_description` and transcripts from `GET /demo`. With a `job_id` the flag is accepted and ignored, the job already knows. The server uses the memory store in this mode, so no step needs a database or the network.
 
 | Step | In demo mode |
 | --- | --- |
-| `/research` with `demo:true` | Stored facts, no network and no LLM. `job.demo` is true, `cached` is true |
+| `/research` with `demo:true` | Stored facts, no network and no LLM. `job.demo` is true, `cached` is true. These 8 claims are short rewrites compared by hand with the live pages, not verbatim sentences like a normal `/research` |
 | First `/session` of a demo job | Prebuilt questions, no LLM |
 | Later `/session` of a demo job | Tries the LLM for up to 30 s, then the prebuilt questions again |
 | `/grade` | With exactly `transcript` or `followup_transcript` : tries the LLM for up to 45 s, then returns that transcript's canned score with `fallback:true`. `followup_transcript` on the session from `/next` shows real progress rows. Any other transcript gets the normal error, demo quotes are never shown for it |

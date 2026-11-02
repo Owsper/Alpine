@@ -3,7 +3,7 @@
 Interview practice API : job description, sourced company facts, session, transcript, grading, next session.
 Practice tool only. Not for hiring or selection. Text of the answers only, no audio.
 
-Frontend contract (draft) : [docs/api.md](docs/api.md).
+Frontend contract (draft) : [docs/api.md](docs/api.md). Screen by screen wiring, field map and the decisions the frontend team has to make : [docs/frontend.md](docs/frontend.md).
 
 ## Setup
 
@@ -24,16 +24,18 @@ curl http://localhost:8787/health
 
 Without `SUPABASE_URL` it uses a memory store and nothing is persisted. `.env` is gitignored, keep it that way.
 
+Fetched pages are parsed in up to 4 child processes, started on first use and kept for reuse. Each took about 75 to 120 MB on Windows, with at most 256 MB of heap. They get no env vars and exit with the server.
+
 ## Env vars
 
 | Var | Default | |
 | --- | --- | --- |
-| `LLM_BASE_URL` | required | OpenAI compatible relay, without `/v1` |
-| `LLM_API_KEY` | required | relay key |
+| `LLM_BASE_URL` | required, except with `DEMO_MODE=1` | OpenAI compatible relay, without `/v1` |
+| `LLM_API_KEY` | required, except with `DEMO_MODE=1` | relay key |
 | `LLM_MODEL` | `zai-org/GLM-5.3-Flash` | |
 | `LLM_FALLBACK_MODEL` | `deepseek-ai/DeepSeek-V4.1-Flash` | used when the main model fails, except on 401, 402 or 403 and on output that fails validation |
 | `LLM_TIMEOUT_MS` | `60000` | per call |
-| `LLM_DAILY_CALL_CAP` | `2000` | in memory, per process, resets at 00:00 UTC. One client can use a fifth of it |
+| `LLM_DAILY_CALL_CAP` | `2000` | in memory, per process, resets at 00:00 UTC. One client can use a fifth of it and at least 3 calls. Calls the provider did not answer count against the cap, not against that share |
 | `SUPABASE_URL` | none | set it to use Supabase instead of the memory store |
 | `SUPABASE_SERVICE_ROLE_KEY` | none | required with `SUPABASE_URL`, server side only |
 | `CORS_ORIGIN` | `http://localhost:5173` | one origin, the Vite dev server by default |
@@ -93,7 +95,13 @@ The migration turns on row level security with no policies and grants the tables
 
 Lets a demo survive an LLM or network outage. It always uses the memory store, even with `SUPABASE_URL` set, so a restart loses the data.
 
+**Frontend teammates start here.** It needs no relay key : `LLM_BASE_URL` and `LLM_API_KEY` can stay empty, the LLM steps fail at once and use the canned data. Copy the env file once, then start :
+
 ```
+cd backend
+npm install
+cp .env.example .env
+
 # Git Bash
 DEMO_MODE=1 npm start
 
@@ -101,14 +109,21 @@ DEMO_MODE=1 npm start
 $env:DEMO_MODE='1'; npm start
 ```
 
-Or set `DEMO_MODE=1` in `.env`.
+Or set `DEMO_MODE=1` in `.env`. Only `demo:true` requests work without a key. A normal `/research` or a transcript other than the demo ones gets `llm_unavailable`.
 
 Get the job description and the two transcripts from `GET /demo`, then run the normal flow with `demo:true` on `/research` or on `/session` with a job description. Research and the first session use stored data with no LLM call. `/grade` and `/next` try the LLM first and fall back to canned results, after 45 s and 30 s at most if it hangs. The canned scores are only ever used for the exact demo transcripts. Details in [docs/api.md](docs/api.md#demo-mode).
 
-The stored data is in `src/demo/`. The job description is a marked sample. The company facts are captured from the real site and go out of date, so refresh them before a demo :
+The stored data is in `src/demo/`. The job description is a marked sample. The 8 company facts were compared by hand with the live pages on 2026-11-02. They are short rewrites from before claims became verbatim sentences, so they differ from what `/research` returns now. They go out of date, but **do not refresh them right before a demo**. Refreshing replaces them with whatever this run picks, so read the diff and run `npm test` afterwards :
 
 ```
 npx tsx --env-file=.env scripts/capture-demo.ts
 ```
 
-It only captures N26, because the job, questions and transcripts are written for N26. It exits with 1 and saves nothing if the run lacks a fact the question bank quotes, and the model does not pick the same facts every time, so run it again in that case.
+It only captures N26, because the job, questions and transcripts are written for N26. It exits with 1 and saves nothing if the run lacks a fact the question bank quotes. The model does not pick the same sentences every time (3 of 4 runs on 2026-11-02 had them all), so run it again in that case.
+
+## Before real users
+
+- **LLM provider** : the relay is an unnamed third party with no DPA or zero-retention evidence, while the research asks for an EU region, a DPA and zero retention. Transcripts and job descriptions go through it, so switch provider first.
+- **Supabase** : the EU project still has to be created, nothing is persisted until then.
+- **Retention** : nothing enforces the 12 month transcript retention, data stays until the user deletes it.
+- **Relay key** : it was pasted in a chat, rotate it.

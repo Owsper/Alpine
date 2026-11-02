@@ -15,11 +15,11 @@ const HOME_URL = 'https://acme.test/'
 const ABOUT_URL = 'https://acme.test/about'
 const HOME = '<html><body><nav>Menu navtext here</nav><h1>Acme Robotics</h1><p>Acme builds warehouse robots for mid-sized retailers across Europe.</p><footer>Footer boilerplate text</footer></body></html>'
 const ABOUT = '<html><body><p>Founded in Graz in 2011, the company now employs 340 people.</p></body></html>'
-const Q_HOME = 'Acme builds warehouse robots for mid-sized retailers'
-const Q_ABOUT = 'Founded in Graz in 2011'
+const Q_HOME = 'Acme builds warehouse robots for mid-sized retailers across Europe.'
+const Q_ABOUT = 'Founded in Graz in 2011, the company now employs 340 people.'
 
 const company = (o = {}) => ({company_name:'Acme Robotics',role_title:'Backend Engineer',guess_url:null,...o})
-const fact = (o = {}) => ({claim:'Acme builds warehouse robots.',source_url:HOME_URL,quote:Q_HOME,...o})
+const fact = (o = {}) => ({source_url:HOME_URL,quote:Q_HOME,...o})
 
 type Page = {html:string,url?:string,retrieved_at?:string}
 
@@ -64,7 +64,7 @@ describe('happy path',() => {
 		expect(b.warnings).toEqual([])
 		expect(b.disclaimer).toBe('Practice tool. Not affiliated with any company mentioned. No guarantee of job offers.')
 		expect(b.job).toMatchObject({user_id:USER,description:JD,company_name:'Acme Robotics',company_url:HOME_URL,company_key:'acme.test',role_title:'Backend Engineer',demo:false})
-		expect(b.facts).toEqual([{claim:'Acme builds warehouse robots.',source_url:HOME_URL,retrieved_at:AT}])
+		expect(b.facts).toEqual([{claim:Q_HOME,source_url:HOME_URL,retrieved_at:AT}])
 		expect(await store.getJob(b.job.id)).toEqual(b.job)
 		expect(await store.getFacts(b.job.id)).toEqual(b.facts)
 		expect(names(llm)).toEqual(['research_company','research_facts'])
@@ -100,9 +100,9 @@ describe('happy path',() => {
 
 describe('fact verification',() => {
 	it('drops a fabricated quote',async () => {
-		const {app} = build({facts:() => ({facts:[fact(),fact({claim:'Acme has 9000 staff.',quote:'Acme employs nine thousand people worldwide'})]})})
+		const {app} = build({facts:() => ({facts:[fact(),fact({quote:'Acme employs nine thousand people worldwide'})]})})
 		const b = await (await post(app,ask())).json()
-		expect(b.facts.map((f:{claim:string}) => f.claim)).toEqual(['Acme builds warehouse robots.'])
+		expect(b.facts.map((f:{claim:string}) => f.claim)).toEqual([Q_HOME])
 	})
 
 	it.each([
@@ -130,13 +130,49 @@ describe('fact verification',() => {
 		expect((await (await post(app,ask())).json()).facts).toEqual([])
 	})
 
-	it.each(['Acme','the','   '])('drops a quote too short to prove anything : %j',async (quote) => {
-		const {app} = build({facts:() => ({facts:[fact({quote})]})})
+	it.each(['Acme','the','   ','Acme Robotics','Acme builds warehouse','Acme - builds - robots','Founded in 2011'])('drops a quote under 4 words : %j',async (quote) => {
+		const html = '<html><body><h1>Acme Robotics</h1><p>Acme - builds - robots. Founded in 2011. Acme builds warehouse robots.</p></body></html>'
+		const {app} = build({pages:{[HOME_URL]:html},facts:() => ({facts:[fact({quote})]})})
 		expect((await (await post(app,ask())).json()).facts).toEqual([])
 	})
 
-	it('drops an empty claim',async () => {
-		const {app} = build({facts:() => ({facts:[fact({claim:'  '})]})})
+	it('keeps a quote of exactly 4 words',async () => {
+		const {app} = build({facts:() => ({facts:[fact({quote:'Acme builds warehouse robots'})]})})
+		expect((await (await post(app,ask())).json()).facts[0].claim).toBe('Acme builds warehouse robots')
+	})
+
+	it('the claim is the quote, whatever else the model wrote',async () => {
+		const {app} = build({facts:() => ({facts:[{...fact(),claim:'Acme is the world leader in robots.'}]})})
+		expect((await (await post(app,ask())).json()).facts).toEqual([{claim:Q_HOME,source_url:HOME_URL,retrieved_at:AT}])
+	})
+
+	it('only whitespace of the quote is changed',async () => {
+		const {app} = build({facts:() => ({facts:[fact({quote:'  Acme   builds\n\twarehouse robots\u00a0for mid-sized retailers across Europe. '})]})})
+		expect((await (await post(app,ask())).json()).facts[0].claim).toBe(Q_HOME)
+	})
+
+	it.each([
+		['with a word at the cut','Acme ' + 'builds robots '.repeat(25) + 'for everyone.'],
+		['with a space at the cut','Acme builds robots ' + 'a'.repeat(281) + ' and more words here.'],
+	])('drops a sentence over 300 chars instead of cutting it, %s',async (name,long) => {
+		expect(long.length).toBeGreaterThan(300)
+		const {app} = build({pages:{[HOME_URL]:`<html><body><p>${long}</p></body></html>`},facts:() => ({facts:[fact({quote:long})]})})
+		expect((await (await post(app,ask())).json()).facts).toEqual([])
+	})
+
+	it('asks the model for the source and the sentence only',async () => {
+		const {app,llm} = build()
+		await post(app,ask())
+		const call = llm.calls[1]
+		expect(call.schema.parse({facts:[{claim:'c',source_url:'u',quote:'q'}]})).toEqual({facts:[{source_url:'u',quote:'q'}]})
+		expect(() => call.schema.parse({facts:[{claim:'c',source_url:'u'}]})).toThrow()
+		for (const asked of ['complete','copied as written','marketing superlatives','navigation','legal','cookie']) expect(call.system).toContain(asked)
+		expect(call.system).not.toContain('claim')
+	})
+
+	it('a quote that is only in hidden text is dropped',async () => {
+		const html = '<html><body><p>Acme builds warehouse robots today.</p><div hidden>Acme employs nine thousand people worldwide.</div></body></html>'
+		const {app} = build({pages:{[HOME_URL]:html},facts:() => ({facts:[fact({quote:'Acme employs nine thousand people worldwide.'})]})})
 		expect((await (await post(app,ask())).json()).facts).toEqual([])
 	})
 
@@ -144,7 +180,7 @@ describe('fact verification',() => {
 		['case','ACME BUILDS WAREHOUSE ROBOTS'],
 		['whitespace','Acme   builds\n\twarehouse  robots'],
 		['curly quotes','the “best” robots aren’t cheap'],
-		['nfkc','warehouse ｒobots'],
+		['nfkc','Acme builds warehouse ｒobots'],
 	])('keeps a quote that only differs by %s',async (name,quote) => {
 		const html = '<html><body><p>Acme builds warehouse robots. We say the "best" robots aren\'t cheap.</p></body></html>'
 		const {app} = build({pages:{[HOME_URL]:html},facts:() => ({facts:[fact({quote})]})})
@@ -156,25 +192,22 @@ describe('fact verification',() => {
 			pages:{[HOME_URL]:{html:HOME,retrieved_at:AT},[ABOUT_URL]:{html:ABOUT,retrieved_at:AT2}},
 			facts:() => ({facts:[
 				{...fact(),retrieved_at:'1999-01-01T00:00:00.000Z'},
-				{...fact({source_url:ABOUT_URL,quote:Q_ABOUT,claim:'Founded in 2011.'}),retrieved_at:'1999-01-01T00:00:00.000Z'},
+				{...fact({source_url:ABOUT_URL,quote:Q_ABOUT}),retrieved_at:'1999-01-01T00:00:00.000Z'},
 			]}),
 		})
 		const b = await (await post(app,ask())).json()
 		expect(b.facts.map((f:{retrieved_at:string}) => f.retrieved_at)).toEqual([AT,AT2])
 	})
 
-	it('never returns or stores the quote',async () => {
+	it('never returns or stores a quote field',async () => {
 		const {app,store} = build()
-		const res = await post(app,ask())
-		const text = await res.clone().text()
-		const b = await res.json()
-		expect(text).not.toContain(Q_HOME)
+		const b = await (await post(app,ask())).json()
 		expect(Object.keys(b.facts[0]).sort()).toEqual(['claim','retrieved_at','source_url'])
 		expect(Object.keys((await store.getFacts(b.job.id))[0]).sort()).toEqual(['claim','retrieved_at','source_url'])
 	})
 
 	it('keeps at most 8 facts',async () => {
-		const {app} = build({facts:() => ({facts:Array.from({length:12},(x,i) => fact({claim:'c' + i}))})})
+		const {app} = build({facts:() => ({facts:Array.from({length:12},() => fact())})})
 		expect((await (await post(app,ask())).json()).facts).toHaveLength(8)
 	})
 
@@ -218,6 +251,60 @@ describe('pages',() => {
 		expect(b.facts.map((f:{source_url:string}) => f.source_url)).toEqual(['https://www.acme.test/about/'])
 	})
 
+	describe('research-live-6 : a path that redirects to another topic',() => {
+		const land = async (path:string,to:string) => {
+			const {app,llm} = build({pages:{[HOME_URL]:HOME,['https://acme.test' + path]:{html:ABOUT,url:'https://acme.test' + to}},facts:() => ({facts:[]})})
+			await post(app,ask())
+			return JSON.parse(llm.calls[1].user).pages.map((p:{url:string}) => p.url)
+		}
+
+		it.each([
+			['/about','/efood'],
+			['/about','/sitemap/'],
+			['/careers','/'],
+			['/mission','/brands/efood'],
+		])('%s landing on %s is dropped',async (path,to) => {
+			expect(await land(path,to)).toEqual([HOME_URL])
+		})
+
+		it.each([
+			['/about','/about/'],
+			['/about','/en-eu/about'],
+			['/about','/ABOUT'],
+			['/about-us','/about'],
+			['/about','/about-us'],
+			['/careers','/en-eu/careers/open'],
+			['/values','/about/values'],
+		])('%s landing on %s is kept',async (path,to) => {
+			expect(await land(path,to)).toEqual([HOME_URL,'https://acme.test' + to])
+		})
+
+		it('the home page can land anywhere on the site',async () => {
+			const {app,llm} = build({pages:{[HOME_URL]:{html:HOME,url:'https://acme.test/en-eu/'}},facts:() => ({facts:[]})})
+			await post(app,ask())
+			expect(JSON.parse(llm.calls[1].user).pages.map((p:{url:string}) => p.url)).toEqual(['https://acme.test/en-eu/'])
+		})
+
+		it('a dropped page does not use up the page budget',async () => {
+			const six = ['/','/about','/about-us','/company','/mission','/values'].map((p) => 'https://acme.test' + p)
+			const pages:Record<string,Page> = Object.fromEntries(six.map((u) => [u,{html:'<body><p>' + u + ' words</p></body>'}]))
+			pages['https://acme.test/about'] = {html:ABOUT,url:'https://acme.test/efood'}
+			pages['https://acme.test/careers'] = {html:'<body><p>jobs words</p></body>'}
+			const {app,llm} = build({pages,facts:() => ({facts:[]})})
+			await post(app,ask())
+			const got = JSON.parse(llm.calls[1].user).pages.map((p:{url:string}) => p.url)
+			expect(got).toHaveLength(6)
+			expect(got).not.toContain('https://acme.test/efood')
+			expect(got).toContain('https://acme.test/careers')
+		})
+
+		it('tells the model to skip a page about a subsidiary or brand',async () => {
+			const {app,llm} = build()
+			await post(app,ask())
+			expect(llm.calls[1].system).toContain('subsidiary or brand')
+		})
+	})
+
 	it('no fetchable page skips the facts call',async () => {
 		const {app,llm} = build({pages:{}})
 		const b = await (await post(app,ask())).json()
@@ -238,6 +325,40 @@ describe('pages',() => {
 		expect(await pageText(html)).toHaveLength(12000)
 		const {app} = build({pages:{[HOME_URL]:html},facts:() => ({facts:[fact({quote:'this quote is past the cut'})]})})
 		expect((await (await post(app,ask())).json()).facts).toEqual([])
+	})
+
+	it.each([
+		['script','<script>gone words</script>'],
+		['style','<style>gone words</style>'],
+		['noscript','<noscript>gone words</noscript>'],
+		['template','<template><p>gone words</p></template>'],
+		['svg','<svg><title>gone words</title><text>gone words</text></svg>'],
+		['the hidden attribute','<div hidden>gone words</div>'],
+		['a hidden attribute with a value','<div hidden="hidden">gone words</div>'],
+		['an uppercase hidden attribute','<DIV HIDDEN>gone words</DIV>'],
+		['aria-hidden true','<span aria-hidden="true">gone words</span>'],
+		['aria-hidden TRUE','<span aria-hidden="TRUE">gone words</span>'],
+		['display none','<div style="display:none">gone words</div>'],
+		['spaced display none','<div style="color: red; DISPLAY : NONE !important">gone words</div>'],
+		['visibility hidden','<span style="visibility:hidden">gone words</span>'],
+		['spaced visibility hidden','<span style="margin:0 ; visibility: hidden;">gone words</span>'],
+		['a child of a hidden element','<div hidden><section><p>gone <b>words</b></p></section></div>'],
+		['a hidden element with another id','<div hidden id="radix-S:a">gone words</div>'],
+		['a hidden element inside a streamed segment','<div hidden id="S:a"><div hidden>gone words</div></div>'],
+	])('pageText drops %s',async (name,html) => {
+		expect(await pageText(`<body><p>shown words</p>${html}</body>`)).toBe('shown words')
+	})
+
+	it.each([
+		['aria-hidden false','<p aria-hidden="false">kept words</p>'],
+		['another display','<p style="display:block">kept words</p>'],
+		['visibility visible','<p style="visibility:visible">kept words</p>'],
+		['a custom property that only looks like it','<p style="--display:none">kept words</p>'],
+		['a data attribute','<p data-hidden="true">kept words</p>'],
+		['a hidden class we can not see','<p class="hidden">kept words</p>'],
+		['a segment react streams into place','<template id="B:a"></template><div hidden id="S:a"><p>kept words</p></div><script>$RC("B:a","S:a")</script>'],
+	])('pageText keeps %s',async (name,html) => {
+		expect(await pageText(`<body>${html}</body>`)).toBe('kept words')
 	})
 
 	it('pageText separates blocks and leaves inline text alone',async () => {
