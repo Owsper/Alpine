@@ -9,9 +9,11 @@ import Research from './screens/Research.jsx'
 import Interview from './screens/Interview.jsx'
 import Report from './screens/Report.jsx'
 import Progress from './screens/Progress.jsx'
+import Landing from './screens/Landing.jsx'
 
 export default function App() {
-  const { pathname } = useLocation()
+  const location = useLocation()
+  const { pathname } = location
   const { unlocked } = useFlow()
   const mainRef = useRef(null)
   const previousPath = useRef(pathname)
@@ -29,6 +31,15 @@ export default function App() {
     }
   }, [pathname, stepIndex])
 
+  // The landing page stands on its own, without the sidebar and stepper of the app.
+  if (pathname === '/') {
+    return (
+      <>
+        <Landing />
+      </>
+    )
+  }
+
   return (
     <div className="app-shell">
       <a className="skip-link" href="#main">
@@ -41,14 +52,17 @@ export default function App() {
           {stepIndex > unlocked ? (
             <Navigate to={steps[unlocked].to} replace />
           ) : (
-            <Routes>
-              <Route path="/" element={<JobPosting />} />
-              <Route path="/research" element={<Research />} />
-              <Route path="/interview" element={<Interview />} />
-              <Route path="/report" element={<Report />} />
-              <Route path="/progress" element={<Progress />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
+            // Keyed by path so every screen plays its entrance once when you arrive
+            <div className="route" key={pathname}>
+              <Routes location={location}>
+                <Route path="/start" element={<JobPosting />} />
+                <Route path="/research" element={<Research />} />
+                <Route path="/interview" element={<Interview />} />
+                <Route path="/report" element={<Report />} />
+                <Route path="/progress" element={<Progress />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </div>
           )}
         </main>
       </div>

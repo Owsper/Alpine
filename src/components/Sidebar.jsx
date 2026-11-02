@@ -7,7 +7,7 @@ import { useFlow } from '../flow.jsx'
 const COLLAPSED_KEY = 'interviewverse-sidebar-collapsed'
 
 const icons = {
-  '/': FileText,
+  '/start': FileText,
   '/research': Search,
   '/interview': MessageCircleMore,
   '/report': ChartNoAxesColumn,

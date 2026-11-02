@@ -1,17 +1,24 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter } from 'react-router-dom'
+import { BrowserRouter, HashRouter } from 'react-router-dom'
 import '@fontsource-variable/inter'
+import '@fontsource-variable/bricolage-grotesque'
 import App from './App.jsx'
 import { FlowProvider } from './flow.jsx'
 import './styles.css'
+import './layout.css'
+import './call.css'
+import './motion.css'
+
+// Opened straight from disk there is no server to answer /research, so routes live in the hash.
+const Router = window.location.protocol === 'file:' ? HashRouter : BrowserRouter
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <BrowserRouter>
+    <Router>
       <FlowProvider>
         <App />
       </FlowProvider>
-    </BrowserRouter>
+    </Router>
   </StrictMode>,
 )

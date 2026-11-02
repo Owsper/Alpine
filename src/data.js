@@ -1,7 +1,7 @@
 // Demo content from the Figma file. Nothing here comes from a real backend yet.
 
 export const steps = [
-  { to: '/', label: 'Job posting' },
+  { to: '/start', label: 'Job posting' },
   { to: '/research', label: 'Research' },
   { to: '/interview', label: 'Interview' },
   { to: '/report', label: 'Report' },

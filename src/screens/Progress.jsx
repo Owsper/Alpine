@@ -1,6 +1,8 @@
-import { Plus } from 'lucide-react'
+import { ArrowRight, Plus } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import Confetti from '../components/Confetti.jsx'
+import SplitText from '../components/SplitText.jsx'
 import Stat from '../components/Stat.jsx'
 import { averageScore, dimensions, sessionResults } from '../data.js'
 import { useFlow } from '../flow.jsx'
@@ -25,36 +27,15 @@ function ScoreBar({ label, score, className, from }) {
 export default function Progress() {
   const navigate = useNavigate()
   const { job, startNewPosition, resetInterview, interviewsCompleted } = useFlow()
+  const dialogRef = useRef(null)
+  const [saveFailed, setSaveFailed] = useState(false)
   // A comparison needs two finished interviews. Until then only the first one is shown.
   const latest = Math.max(1, interviewsCompleted)
   const comparing = latest > 1
   const previous = comparing ? latest - 1 : 1
   const firstAverage = averageScore('session1')
   const secondAverage = averageScore('session2')
-  const dialogRef = useRef(null)
-  const [saveFailed, setSaveFailed] = useState(false)
-
-  function downloadReport() {
-    const result = sessionResults[Math.min(latest, sessionResults.length) - 1]
-    const pdf = buildReportPdf({
-      job,
-      date: new Date().toLocaleDateString('en-US', { dateStyle: 'long' }),
-      title: comparing ? `Progress: session ${previous} vs session ${latest}` : 'Progress: session 1',
-      stats: comparing
-        ? [
-            { label: `Session ${previous}`, value: firstAverage.toFixed(1) },
-            { label: `Session ${latest}`, value: secondAverage.toFixed(1) },
-            { label: 'Change', value: `+${(secondAverage - firstAverage).toFixed(1)}`, good: true },
-          ]
-        : [{ label: 'Session 1', value: firstAverage.toFixed(1) }],
-      rows: dimensions.map((d) => ({ name: d.name, before: d.session1, after: comparing ? d.session2 : undefined })),
-      previous,
-      latest,
-      strongest: result.strongest,
-      focus: result.focus,
-    })
-    downloadPdf(pdf, job.company)
-  }
+  const title = comparing ? `Progress: session ${previous} vs session ${latest}` : 'Progress: session 1'
 
   function openConfirm() {
     setSaveFailed(false)
@@ -72,27 +53,53 @@ export default function Progress() {
       return
     }
     dialogRef.current.close()
-    navigate('/')
+    navigate('/start')
+  }
+
+  function downloadReport() {
+    const result = sessionResults[Math.min(latest, sessionResults.length) - 1]
+    const pdf = buildReportPdf({
+      job,
+      date: new Date().toLocaleDateString('en-US', { dateStyle: 'long' }),
+      title,
+      stats: comparing
+        ? [
+            { label: `Session ${previous}`, value: firstAverage.toFixed(1) },
+            { label: `Session ${latest}`, value: secondAverage.toFixed(1) },
+            { label: 'Change', value: `+${(secondAverage - firstAverage).toFixed(1)}`, good: true },
+          ]
+        : [{ label: 'Session 1', value: firstAverage.toFixed(1) }],
+      rows: dimensions.map((d) => ({ name: d.name, before: d.session1, after: comparing ? d.session2 : undefined })),
+      previous,
+      latest,
+      strongest: result.strongest,
+      focus: result.focus,
+    })
+    downloadPdf(pdf, job.company)
   }
 
   return (
     <div className="page progress">
-      <h1>{comparing ? `Progress: session ${previous} vs session ${latest}` : 'Progress: session 1'}</h1>
-      <p className="lede">
+      <SplitText as="h1" text={title} step={18} />
+      <p className="lede rise" style={{ '--i': 1 }}>
         {comparing
           ? `See how your ${latest === 2 ? 'second' : 'latest'} interview improved after targeted practice.`
           : 'Finish your next interview to see how your scores change.'}
       </p>
       <div className="stats">
-        <Stat label={`Session ${previous}`} value={firstAverage.toFixed(1)} />
+        <Stat label={`Session ${previous}`} value={firstAverage.toFixed(1)} index={0} />
         {comparing && (
           <>
-            <Stat label={`Session ${latest}`} value={secondAverage.toFixed(1)} />
-            <Stat label="Change" value={`+${(secondAverage - firstAverage).toFixed(1)}`} tone="good" />
+            <Stat label={`Session ${latest}`} value={secondAverage.toFixed(1)} index={1} />
+            {/* The confetti is for an earned moment, so it only plays when there is an improvement to show. */}
+            <div className="stat-burst">
+              <Stat label="Change" value={`+${(secondAverage - firstAverage).toFixed(1)}`} tone="good" index={2} />
+              <Confetti count={160} />
+            </div>
           </>
         )}
       </div>
-      <section className="card compare" aria-labelledby="compare-title">
+      <section className="card compare rise" style={{ '--i': 3 }} aria-labelledby="compare-title">
         <div className="compare-header">
           <h2 id="compare-title">Scores by dimension</h2>
           <ul className="legend">
@@ -123,10 +130,10 @@ export default function Progress() {
             </tr>
           </thead>
           <tbody>
-            {dimensions.map((d) => {
+            {dimensions.map((d, i) => {
               const delta = d.session2 - d.session1
               return (
-                <tr key={d.name}>
+                <tr key={d.name} style={{ '--i': i }}>
                   <th scope="row">{d.name}</th>
                   <td>
                     <div className="comparison">
@@ -147,9 +154,10 @@ export default function Progress() {
           </tbody>
         </table>
       </section>
-      <div className="actions">
-        <Link className="btn btn-primary" to="/interview" onClick={resetInterview}>
-          Start next interview
+      <div className="actions rise" style={{ '--i': 4 }}>
+        <Link className="btn btn-primary btn-cta" to="/interview" onClick={resetInterview}>
+          <span>Start next interview</span>
+          <ArrowRight className="btn-arrow" size={18} strokeWidth={1.75} aria-hidden="true" />
         </Link>
         <button className="btn" type="button" onClick={downloadReport}>
           Download report

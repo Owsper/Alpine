@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import femaleInterviewer from '../assets/interviewer-female.webp'
 import maleInterviewer from '../assets/interviewer-male.webp'
 import { currentQuestion, generateQuestions } from '../data.js'
+import VoiceField from '../components/VoiceField.jsx'
 import { useFlow } from '../flow.jsx'
 
 const INTERVIEWERS = [
@@ -127,12 +128,22 @@ export default function Interview() {
   return (
     <div className="interview">
       <h1 className="sr-only">Interview</h1>
-      <section className="stage" aria-label="Interview call">
+      <section className="stage rise" style={{ '--i': 0 }} aria-label="Interview call">
         <div className="call-video">
           <div className={`call-tile interviewer-tile ${interviewerIsMain ? 'main' : 'pip'}`}>
             <img src={activeInterviewer.src} width="1672" height="941" alt={`${activeInterviewer.label} AI interviewer`} fetchPriority="high" />
             {interviewerIsMain ? (
-              started && <span className="speaking">Speaking…</span>
+              started && (
+                <span className="speaking">
+                  <span className="eq" aria-hidden="true">
+                    <i />
+                    <i />
+                    <i />
+                    <i />
+                  </span>
+                  Speaking…
+                </span>
+              )
             ) : (
               <>
                 <span className="tile-name">Interviewer</span>
@@ -172,22 +183,32 @@ export default function Interview() {
             <span className="stage-pill">
               {interviewerIsMain ? (
                 <>
-                  <Sparkle size={20} strokeWidth={1.75} aria-hidden="true" />
+                  <span className="live-dot" aria-hidden="true" />
+                  <Sparkle size={18} strokeWidth={1.75} aria-hidden="true" />
                   AI interviewer
                 </>
               ) : (
                 <>
-                  <User size={20} strokeWidth={1.75} aria-hidden="true" />
+                  <User size={18} strokeWidth={1.75} aria-hidden="true" />
                   You
                 </>
               )}
             </span>
             <span className="stage-pill timer" role="timer" aria-label="Elapsed time">
-              <Clock size={20} strokeWidth={1.75} aria-hidden="true" />
-              {formatElapsed(elapsed)}
+              <Clock size={18} strokeWidth={1.75} aria-hidden="true" />
+              <span className="timer-digits">
+                {formatElapsed(elapsed)
+                  .split('')
+                  .map((char, i) => (
+                    <span key={`${i}-${char}`} className="timer-digit">
+                      {char}
+                    </span>
+                  ))}
+              </span>
             </span>
           </div>
         </div>
+        <VoiceField rows={8} cols={80} className="call-field" />
         {cameraError && (
           <p className="call-notice" role="alert">
             {cameraError}
@@ -217,13 +238,13 @@ export default function Interview() {
           )}
         </div>
       </section>
-      <aside className="card session">
+      <aside className="card session rise" style={{ '--i': 1 }}>
         <h2>Session</h2>
         <ol className="questions">
           {questions.map((question, i) => {
             const state = questionState(i, started)
             return (
-              <li key={question} className={state} aria-current={state === 'current' ? 'step' : undefined}>
+              <li key={question} className={state} style={{ '--i': i }} aria-current={state === 'current' ? 'step' : undefined}>
                 <span className="question-marker">
                   {state === 'done' && <Check size={13} strokeWidth={3.5} aria-label="Completed" />}
                 </span>
