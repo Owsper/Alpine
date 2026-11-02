@@ -49,10 +49,10 @@ function fake() {
 	return fakeLlm({
 		research_company:() => ({company_name:'Acme Robotics',role_title:'Backend Engineer',guess_url:null}),
 		research_facts:() => ({facts:[
-			{claim:'Acme builds warehouse robots.',source_url:HOME_URL,quote:Q_HOME},
-			{claim:'Acme was founded in 2011.',source_url:ABOUT_URL,quote:Q_ABOUT},
-			{claim:'Acme employs 9000 people.',source_url:ABOUT_URL,quote:'Acme employs 9000 people worldwide.'},
-			{claim:'Acme is loved by all.',source_url:'https://acme.test/blog',quote:Q_HOME},
+			{source_url:HOME_URL,quote:Q_HOME},
+			{source_url:ABOUT_URL,quote:Q_ABOUT},
+			{source_url:ABOUT_URL,quote:'Acme employs 9000 people worldwide.'},
+			{source_url:'https://acme.test/blog',quote:Q_HOME},
 		]}),
 		session:() => ({questions:[
 			{text:'What does a good API look like?',is_anchor:false},
@@ -122,7 +122,7 @@ describe('full flow over http',() => {
 		expect(r.cached).toBe(false)
 		expect(r.warnings).toEqual([])
 		expect(r.disclaimer).toContain('Not affiliated')
-		expect(r.facts.map((f:Fact) => [f.claim,f.source_url])).toEqual([['Acme builds warehouse robots.',HOME_URL],['Acme was founded in 2011.',ABOUT_URL]])
+		expect(r.facts.map((f:Fact) => [f.claim,f.source_url])).toEqual([[Q_HOME,HOME_URL],[Q_ABOUT,ABOUT_URL]])
 		for (const f of r.facts) expect(Object.keys(Fact.parse(f)).sort()).toEqual(Object.keys(f).sort())
 
 		const asked = wire.mock.calls.map((a) => a[0].href)
@@ -139,8 +139,8 @@ describe('full flow over http',() => {
 		expect(s1.flow.map((f) => f.type)).toEqual(['intro','question','question','question','question','question','outro'])
 		expect(s1.flow[0].text).toContain('I am an AI interviewer')
 		expect(s1.flow[0].text).toContain('no audio')
-		expect(s1.interviewer_instructions).toContain('Acme builds warehouse robots.')
-		expect(JSON.parse(llm.calls.find((c) => c.name === 'session')!.user).company_facts).toEqual(['Acme builds warehouse robots.','Acme was founded in 2011.'])
+		expect(s1.interviewer_instructions).toContain(Q_HOME)
+		expect(JSON.parse(llm.calls.find((c) => c.name === 'session')!.user).company_facts).toEqual([Q_HOME,Q_ABOUT])
 
 		expect(await ok(await app.request(`/session/${s1.id}`))).toMatchObject({session:s1,score:null,facts:r.facts})
 		await failed(await post('/grade',{session_id:s1.id}),409,'invalid_state')

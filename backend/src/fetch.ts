@@ -1,9 +1,9 @@
+import {type ChildProcess,fork,type Serializable} from 'node:child_process'
 import {lookup} from 'node:dns/promises'
 import http from 'node:http'
 import https from 'node:https'
 import {BlockList,isIP,type LookupFunction} from 'node:net'
-import {Worker} from 'node:worker_threads'
-import robotsParser from 'robots-parser'
+import {fileURLToPath} from 'node:url'
 
 export type Fetched = {url:string,html:string,text?:string,retrieved_at:string}
 export type Parsed = {text:string,optOut:boolean}
@@ -13,8 +13,7 @@ export type Io = {
 	resolve(host:string):Promise<Addr[]>
 	get(u:URL,addrs:Addr[],signal:AbortSignal):Promise<Raw>
 }
-type Robots = ReturnType<typeof robotsParser>
-export type FetchOpts = {io?:Io,robots?:Map<string,Promise<Robots>>,timeoutMs?:number,parse?:typeof parseHtml}
+export type FetchOpts = {io?:Io,robots?:Map<string,Promise<string>>,timeoutMs?:number,parse?:typeof parseHtml}
 
 const UA = 'InterviewVerseBot/0.1'
 const TIMEOUT = 8000
@@ -26,7 +25,8 @@ const BLOCKED = ['linkedin','lnkd','licdn','glassdoor','indeed','indeedjobs','ku
 const PROXIES = /(^|\.)translate\.goog$|^webcache\.googleusercontent\.com$/
 const AI_OFF = /\b(noai|notdm)\b/i
 const PARSE_MS = 3000
-const IDLE_WORKERS = 2
+const MAX_WORKERS = 4
+const WORKER_MB = 256
 const LOCAL_HOST = /^[^.]+$|\.(localhost|local|internal)$/
 
 function blockList(type:'ipv4'|'ipv6',subnets:string[]) {
@@ -98,36 +98,71 @@ export const realIo:Io = {
 	},
 }
 
-const idle:Worker[] = []
+const idle:ChildProcess[] = []
+const waiting:(() => void)[] = []
+let busy = 0
 
+// a process and not a worker thread : a 16 KB page can run v8 out of heap, and in a thread that aborts the whole server
 function newWorker() {
-	const w = new Worker(new URL('./parse-worker.mjs',import.meta.url),{execArgv:[],env:{},resourceLimits:{maxOldGenerationSizeMb:256}})
+	const w = fork(fileURLToPath(new URL('./parse-worker.mjs',import.meta.url)),{execArgv:['--max-old-space-size=' + WORKER_MB],env:{},stdio:['ignore','ignore','ignore','ipc']})
 	w.unref()
-	w.on('error',() => {})
+	w.channel?.unref()
+	w.on('error',(e:NodeJS.ErrnoException) => console.error('parser failed',e.code ?? e.name))
+	w.once('exit',() => {
+		if (idle.includes(w)) idle.splice(idle.indexOf(w),1)
+	})
 	return w
 }
 
-// parsing untrusted html can take minutes and synchronous code can not be interrupted, so it runs off the main thread with a hard stop
-export function parseHtml(html:string,ms = PARSE_MS) {
-	return new Promise<Parsed|null>((done) => {
-		const w = idle.pop() ?? newWorker()
-		const finish = (out:Parsed|null) => {
-			clearTimeout(stop)
-			w.off('message',finish)
-			w.off('error',fail)
-			w.off('exit',fail)
-			if (out && idle.length < IDLE_WORKERS) idle.push(w)
-			else void w.terminate()
-			done(out)
-		}
-		const fail = () => finish(null)
-		const stop = setTimeout(fail,ms)
-		w.once('message',finish)
-		w.once('error',fail)
-		w.once('exit',fail)
-		w.postMessage(html)
+function nextJob() {
+	while (busy < MAX_WORKERS && waiting.length) {
+		busy++
+		waiting.shift()!()
+	}
+}
+
+// untrusted input can take minutes and synchronous code can not be interrupted, so it runs elsewhere with a hard stop. Each worker costs memory and a burst must not add up, so there are a few and the rest wait in line
+function inWorker<T>(job:unknown,ms:number,signal?:AbortSignal) {
+	return new Promise<T|null>((done) => {
+		waiting.push(() => {
+			// its fetch gave up while it waited, running it only keeps honest pages in line longer
+			if (signal?.aborted) {
+				busy--
+				return done(null)
+			}
+			const w = idle.pop() ?? newWorker()
+			const finish = (out:T|null) => {
+				clearTimeout(stop)
+				w.off('message',finish)
+				w.off('error',fail)
+				w.off('exit',died)
+				if (out) idle.push(w)
+				else w.kill()
+				busy--
+				done(out)
+				nextJob()
+			}
+			const fail = () => finish(null)
+			const died = (code:number|null) => {
+				console.error('parser exited',code)
+				fail()
+			}
+			const stop = setTimeout(() => {
+				console.error('parser stopped after',ms,'ms')
+				fail()
+			},ms)
+			w.once('message',finish as (m:unknown) => void)
+			w.once('error',fail)
+			w.once('exit',died)
+			w.send(job as Serializable)
+		})
+		nextJob()
 	})
 }
+
+export const parseHtml = (html:string,ms = PARSE_MS,signal?:AbortSignal) => inWorker<Parsed>(html,ms,signal)
+
+const robotsAllow = async (txt:string,url:string,signal:AbortSignal) => (await inWorker<{allowed:boolean}>({txt,url,ua:UA},PARSE_MS,signal))?.allowed === true
 
 async function follow(start:string,key:string,io:Io,signal:AbortSignal,guard?:(u:URL) => Promise<void>) {
 	let url = start
@@ -153,12 +188,12 @@ async function loadRobots(url:string,key:string,io:Io,signal:AbortSignal) {
 		if (r.status === 404) txt = ''
 		if (r.status === 200) txt = r.body
 	} catch {}
-	return robotsParser(url,txt)
+	return txt
 }
 
 export async function safeFetch(url:string,companyKey?:string,o:FetchOpts = {}):Promise<Fetched> {
 	const io = o.io ?? realIo
-	const robots = o.robots ?? new Map<string,Promise<Robots>>()
+	const robots = o.robots ?? new Map<string,Promise<string>>()
 	const key = companyKey ?? keyOf(checkUrl(url))
 	const signal = AbortSignal.timeout(o.timeoutMs ?? TIMEOUT)
 	const timedOut = new Promise<never>((ok,no) => signal.addEventListener('abort',() => no(new Error('timeout'))))
@@ -166,13 +201,13 @@ export async function safeFetch(url:string,companyKey?:string,o:FetchOpts = {}):
 	async function run() {
 		const r = await follow(url,key,io,signal,async (u) => {
 			if (!robots.has(u.origin)) robots.set(u.origin,loadRobots(u.origin + '/robots.txt',key,io,signal))
-			const bot = await robots.get(u.origin)
-			if (!bot?.isAllowed(u.href,UA)) throw new Error('robots')
+			const txt = await robots.get(u.origin)
+			if (txt && !await robotsAllow(txt,u.href,signal)) throw new Error('robots')
 		})
 		if (r.status !== 200) throw new Error('status_' + r.status)
 		if (!/^\s*(text\/html|application\/xhtml\+xml)/i.test(String(r.headers['content-type']))) throw new Error('not_html')
 		if (String(r.headers['tdm-reservation']).trim() === '1' || AI_OFF.test(String(r.headers['x-robots-tag']))) throw new Error('tdm_reserved')
-		const parsed = await (o.parse ?? parseHtml)(r.body)
+		const parsed = await (o.parse ?? parseHtml)(r.body,PARSE_MS,signal)
 		if (!parsed) throw new Error('unparseable')
 		if (parsed.optOut) throw new Error('tdm_reserved')
 		return {url:r.url,html:r.body,text:parsed.text,retrieved_at:new Date().toISOString()}

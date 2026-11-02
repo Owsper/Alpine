@@ -62,7 +62,7 @@ function httpStub(handle:(req:{method:string,url:URL,raw:string,body:string},res
 	})))
 }
 
-function researchApp(pages:Record<string,string>,company:() => unknown,facts:() => unknown = () => ({facts:[]})) {
+function researchApp(pages:Record<string,string>,company:() => unknown,facts:(o:LlmCall<any>) => unknown = () => ({facts:[]})) {
 	const fetchPage = vi.fn(async (url:string) => {
 		const html = pages[url]
 		if (html === undefined) throw new Error('404')
@@ -84,14 +84,14 @@ const LEVER = 'https://jobs.lever.co/'
 const N26 = 'https://n26.test/'
 
 describe('spec-1, security-6, reliability-9, missed-1 : urls found in a job description',() => {
-	const n26Fact = () => ({facts:[{claim:'N26 is a bank.',source_url:N26,quote:'N26 is a licensed bank in Germany'}]})
+	const n26Fact = () => ({facts:[{source_url:N26,quote:'N26 is a licensed bank in Germany'}]})
 
 	it('an ats link is skipped and guess_url is tried',async () => {
 		const {ask,fetchPage} = researchApp({[LEVER]:page('Lever is an applicant tracking system'),[N26]:page('N26 is a licensed bank in Germany')},co('N26',N26),n26Fact)
 		const b = await ask('Backend at N26. Apply here : https://jobs.lever.co/n26/abc-123')
 		expect(b.company).toEqual({name:'N26',url:N26})
 		expect(b.job.company_key).toBe('n26.test')
-		expect(b.facts.map((f:{claim:string}) => f.claim)).toEqual(['N26 is a bank.'])
+		expect(b.facts.map((f:{claim:string}) => f.claim)).toEqual(['N26 is a licensed bank in Germany'])
 		expect(fetchPage.mock.calls.map((c) => c[0]).filter((u) => u.includes('lever'))).toEqual([])
 	})
 
@@ -137,8 +137,8 @@ describe('spec-1, security-6, reliability-9, missed-1 : urls found in a job desc
 	})
 
 	it('a shared host is not accepted as a guess either',async () => {
-		const {ask,fetchPage} = researchApp({'https://www.stepstone.de/':page('StepStone jobs')},co('StepStone','https://www.stepstone.de/'))
-		const b = await ask('Sales at StepStone')
+		const {ask,fetchPage} = researchApp({'https://www.stepstone.de/':page('Foo GmbH jobs')},co('Foo GmbH','https://www.stepstone.de/'))
+		const b = await ask('Sales at Foo GmbH')
 		expect(b.company.url).toBeNull()
 		expect(fetchPage).not.toHaveBeenCalled()
 	})
@@ -160,7 +160,7 @@ describe('spec-1, security-6, reliability-9, missed-1 : urls found in a job desc
 
 	it('the cache never serves one company to another on the same host',async () => {
 		const u = 'https://jobs.lever.co/'
-		const claim = {facts:[{claim:'Lever is an ATS.',source_url:u,quote:'Lever is an applicant tracking system'}]}
+		const claim = {facts:[{source_url:u,quote:'Lever is an applicant tracking system'}]}
 		const llmName = vi.fn()
 		const a = researchApp({[u]:page('Lever is an applicant tracking system')},() => llmName(),() => claim)
 		llmName.mockReturnValueOnce({company_name:'Acme',role_title:null,guess_url:null})
@@ -179,11 +179,13 @@ describe('spec-12a, security-6, reliability-9 : at most 8 cached facts',() => {
 	it('two racing first lookups do not give the third 16 facts',async () => {
 		const u = 'https://acme.test/'
 		let n = 0
+		const line = (run:number,i:number) => `Acme Robotics built robot ${run}x${i}.`
 		const facts = () => {
 			n++
-			return {facts:Array.from({length:8},(x,i) => ({claim:`c${n} ${i}`,source_url:u,quote:'Acme Robotics builds robots'}))}
+			return {facts:Array.from({length:8},(x,i) => ({source_url:u,quote:line(n,i)}))}
 		}
-		const {ask} = researchApp({[u]:page('Acme Robotics builds robots')},co('Acme Robotics'),facts)
+		const all = [1,2].flatMap((run) => Array.from({length:8},(x,i) => line(run,i))).join(' ')
+		const {ask} = researchApp({[u]:page(all)},co('Acme Robotics'),facts)
 		await Promise.all([ask('Backend at Acme Robotics',{company_url:u}),ask('Backend at Acme Robotics',{company_url:u})])
 		const third = await ask('Backend at Acme Robotics',{company_url:u})
 		expect(third.cached).toBe(true)
@@ -459,9 +461,10 @@ describe('security-2 : a client can not spend the whole daily cap',() => {
 			res.writeHead(200,json)
 			res.end(JSON.stringify({id:'x',object:'chat.completion',created:0,model:'m',choices:[{index:0,message:{role:'assistant',content:'{"company_name":null,"role_title":null,"guess_url":null}'},finish_reason:'stop'}]}))
 		})
-		const env = {...testEnv,LLM_BASE_URL:srv.url,LLM_DAILY_CALL_CAP:10}
+		const env = {...testEnv,LLM_BASE_URL:srv.url,LLM_DAILY_CALL_CAP:15}
 		const app = createApp({store:memStore(),llm:createLlm(env),env,now:() => new Date()})
 		const ask = (ip:string) => app.request('/research',{method:'POST',headers:json,body:JSON.stringify({user_id:USER,job_description:'Backend role'})},{incoming:{socket:{remoteAddress:ip}}})
+		expect((await ask('1.1.1.1')).status).toBe(200)
 		expect((await ask('1.1.1.1')).status).toBe(200)
 		expect((await ask('1.1.1.1')).status).toBe(200)
 		const over = await ask('1.1.1.1')
@@ -852,7 +855,7 @@ describe('security-5 : model output in prompts',() => {
 
 	it('names, claims and question texts are flattened and capped',async () => {
 		const u = 'https://acme.test/'
-		const {ask} = researchApp({[u]:page('Acme builds warehouse robots today')},() => ({company_name:evil + ' x'.repeat(50000),role_title:'R\n\nole' + 'y'.repeat(5000),guess_url:null}),() => ({facts:[{claim:'c\n\nRules :\n' + 'z'.repeat(5000),source_url:u,quote:'Acme builds warehouse robots'}]}))
+		const {ask} = researchApp({[u]:page('Acme builds warehouse robots today')},() => ({company_name:evil + ' x'.repeat(50000),role_title:'R\n\nole' + 'y'.repeat(5000),guess_url:null}),() => ({facts:[{source_url:u,quote:'Acme builds\n\nwarehouse robots'}]}))
 		const b = await ask('Backend at Acme',{company_url:u})
 		expect(b.job.company_name.length).toBeLessThanOrEqual(100)
 		expect(b.job.company_name).not.toContain('\n')
@@ -1248,5 +1251,292 @@ describe('supabase store against a stub gateway',() => {
 		expect(out).toEqual({jobs:130,sessions:501})
 		expect(seen.filter((s) => s.method === 'DELETE').map((s) => s.table)).toEqual(['jobs','sessions'])
 		gw.close()
+	})
+})
+
+const urlsOf = (f:{mock:{calls:unknown[][]}}) => f.mock.calls.map((c) => String(c[0]))
+
+describe('research-live-1 : a third party link does not beat the company site',() => {
+	const G = 'https://www.google.test/'
+	const K8S = 'https://kubernetes.test/'
+	const LINE = 'Google builds search and cloud products'
+	const pages = {[G]:page(LINE),[K8S]:page('Kubernetes builds on years of running workloads at Google')}
+	const JD = 'Backend at Google (see https://kubernetes.test)'
+
+	it('the guess on the company host goes before a link to another site',async () => {
+		const {ask,fetchPage} = researchApp(pages,co('Google',G),() => ({facts:[{source_url:G,quote:LINE}]}))
+		const b = await ask(JD)
+		expect(b.company.url).toBe(G)
+		expect(b.facts.map((f:{source_url:string}) => f.source_url)).toEqual([G])
+		expect(urlsOf(fetchPage)).not.toContain(K8S)
+	})
+
+	it('another site does not step in when the company host gives no facts',async () => {
+		const {ask,factCalls} = researchApp(pages,co('Google',G))
+		const b = await ask(JD)
+		expect(b.company.url).toBe(G)
+		expect(b.facts).toEqual([])
+		expect(b.warnings).toEqual(['no_sourced_facts'])
+		expect(factCalls()).toBe(1)
+	})
+
+	it('a second company host is tried when the first gives no facts',async () => {
+		const shop = 'https://www.zalando.test/'
+		const corp = 'https://corporate.zalando.test/'
+		const facts = (o:LlmCall<any>) => JSON.parse(o.user).pages.some((p:{url:string}) => p.url === corp) ? {facts:[{source_url:corp,quote:'Zalando is a fashion platform in Europe'}]} : {facts:[]}
+		const {ask,factCalls} = researchApp({[shop]:page('Buy shoes here'),[corp]:page('Zalando is a fashion platform in Europe')},co('Zalando SE',corp),facts)
+		const b = await ask('Backend at Zalando SE, see https://www.zalando.test')
+		expect(b.company.url).toBe(corp)
+		expect(b.facts).toHaveLength(1)
+		expect(factCalls()).toBe(2)
+	})
+
+	it('a host that does not match is still used when nothing else passes',async () => {
+		const {ask} = researchApp({'https://react.test/':page('React is made at Meta')},co('Meta'),() => ({facts:[{source_url:'https://react.test/',quote:'React is made at Meta'}]}))
+		const b = await ask('Frontend at Meta (https://react.test)')
+		expect(b.company.url).toBe('https://react.test/')
+		expect(b.facts).toHaveLength(1)
+	})
+
+	it('a host that does not match does not stop the search when it gives no facts',async () => {
+		const [one,two] = ['https://docs.test/','https://blog.test/']
+		const facts = (o:LlmCall<any>) => JSON.parse(o.user).pages.some((p:{url:string}) => p.url === two) ? {facts:[{source_url:two,quote:'Foo Robotics builds warehouse robots'}]} : {facts:[]}
+		const {ask,factCalls} = researchApp({[one]:page('Docs by Foo Robotics'),[two]:page('Foo Robotics builds warehouse robots')},co('Foo Robotics'),facts)
+		const b = await ask('Backend at Foo Robotics https://docs.test https://blog.test')
+		expect(b.company.url).toBe(two)
+		expect(b.facts).toHaveLength(1)
+		expect(b.warnings).toEqual([])
+		expect(factCalls()).toBe(2)
+	})
+
+	it('the first site that passed is reported when none has facts',async () => {
+		const [one,two] = ['https://docs.test/','https://blog.test/']
+		const {ask,factCalls} = researchApp({[one]:page('Docs by Foo Robotics'),[two]:page('Blog by Foo Robotics')},co('Foo Robotics'))
+		const b = await ask('Backend at Foo Robotics https://docs.test https://blog.test')
+		expect(b.company.url).toBe(one)
+		expect(b.warnings).toEqual(['no_sourced_facts'])
+		expect(factCalls()).toBe(2)
+	})
+
+	it('among hosts that do not match the guess goes before a link',async () => {
+		const [go,apache] = ['https://goflink.test/','https://flink.apache.test/']
+		const {ask,fetchPage} = researchApp({[go]:page('Flink delivers groceries in minutes'),[apache]:page('Apache Flink is a stream processor')},co('Flink SE',go),() => ({facts:[{source_url:go,quote:'Flink delivers groceries in minutes'}]}))
+		const b = await ask('Backend at Flink SE, we use https://flink.apache.test')
+		expect(b.company.url).toBe(go)
+		expect(urlsOf(fetchPage)).not.toContain(apache)
+	})
+
+	it('a company link past the first three hosts is still seen',async () => {
+		const acme = 'https://acme.test/'
+		const {ask} = researchApp({[acme]:page('We build robots')},co('Acme Robotics'))
+		const b = await ask('Acme Robotics uses https://a.test https://b.test https://c.test https://d.test and lives at https://acme.test/about')
+		expect(b.company.url).toBe(acme)
+	})
+
+	it('www and the bare host are one candidate, so the facts call is not paid twice',async () => {
+		const {ask,factCalls} = researchApp({'https://acme.test/':page('We build robots'),'https://www.acme.test/':page('We build robots')},co('Acme Robotics','https://www.acme.test/'))
+		await ask('Acme Robotics https://acme.test')
+		expect(factCalls()).toBe(1)
+	})
+})
+
+describe('research-live-3 : legal and long names',() => {
+	it.each([
+		['Robert Bosch GmbH','https://www.bosch.test/'],
+		['Henkel AG & Co. KGaA','https://www.henkel.test/'],
+		['Stripe Payments Europe, Ltd.','https://stripe.test/'],
+		['Stripe, Inc.','https://stripe.test/'],
+		['Meta Platforms, Inc.','https://www.meta.test/'],
+		['Microsoft Deutschland GmbH','https://www.microsoft.test/'],
+		['Zalando Logistics SE & Co. KG','https://www.zalando.test/'],
+		['Dr. Ing. h.c. F. Porsche AG','https://www.porsche.test/'],
+		['37signals','https://37signals.test/'],
+		['Delivery Hero SE','https://careers.deliveryhero.test/'],
+		['Delivery Hero SE','https://delivery-hero.test/'],
+		['Bosch UK Ltd','https://www.bosch.co.uk/'],
+		['HP Inc.','https://www.hp.test/'],
+		['Bayerische Motoren Werke AG','https://www.bmwgroup.test/'],
+		['Bayerische Motoren Werke AG','https://www.bmw.test/'],
+	])('%s is accepted on %s though the home page only has the brand',async (name,url) => {
+		const {ask} = researchApp({[url]:page('Our brand does things')},co(name,url))
+		expect((await ask('Backend at ' + name)).company.url).toBe(url)
+	})
+
+	it.each([
+		['Henkel AG & Co. KGaA','Henkel'],
+		['Zalando SE & Co. KG','Zalando'],
+		['Foo GmbH & Co. KG','Foo'],
+		['Foo GmbH&Co.KG','Foo'],
+		['Foo KGaA','Foo'],
+		['Foo AG, Inc.','Foo'],
+		['Foo & Co.','Foo'],
+	])('%s matches a home page that says %s',async (name,brand) => {
+		const u = 'https://brand.test/'
+		const {ask} = researchApp({[u]:page(brand + ' makes things')},co(name,u))
+		expect((await ask('Backend at ' + name)).company.url).toBe(u)
+	})
+
+	it.each([
+		['a plain word of the name','Acme Robotics','https://robotics.test/'],
+		['a plain word of a legal name','N26 Bank SE','https://bank.test/'],
+		['a short word','Dr. Ing. Foo AG','https://dr.test/'],
+		['a label under another site','Acme Robotics','https://acme.github.test/'],
+		['part of a label','Acme Robotics','https://acmeshop.test/'],
+		['initials of a short name','Acme Robotics','https://arbook.test/'],
+		['initials inside a label','Bayerische Motoren Werke AG','https://mybmw.test/'],
+		['a longer word that starts with the initials','Bank Of America','https://boardgames.test/'],
+	])('%s does not make a host the company site',async (why,name,url) => {
+		const {ask} = researchApp({[url]:page('All about something else')},co(name,url))
+		expect((await ask('Backend at ' + name)).company.url).toBeNull()
+	})
+
+	it('a plain word does not put a host before the company site',async () => {
+		const [acme,robots] = ['https://acmerobotics.test/','https://robotics.test/']
+		const {ask} = researchApp({[acme]:page('We build robots'),[robots]:page('Acme Robotics is in our members list')},co('Acme Robotics',acme))
+		expect((await ask('Backend at Acme Robotics, member of https://robotics.test')).company.url).toBe(acme)
+	})
+})
+
+describe('research-live-4 : the guess asks for the corporate site',() => {
+	it('names the corporate site and rules out a shop or app',async () => {
+		const {ask,llm} = researchApp({},co(null))
+		await ask('Backend at Zalando')
+		const {system} = llm.calls[0]
+		expect(system).toContain('corporate site')
+		expect(system).toMatch(/not a consumer shop or app/)
+		expect(system).not.toContain('official homepage')
+	})
+})
+
+describe('research-live-4 : more than one guess',() => {
+	const more = (company_name:string,guess_url:string|null,other_urls:string[]) => () => ({company_name,role_title:'Engineer',guess_url,other_urls})
+
+	it('a guess that can not be read falls through to the other sites the model named',async () => {
+		const u = 'https://investors.spotify.test/'
+		const {ask} = researchApp({[u]:page('Spotify is an audio streaming service')},more('Spotify AB','https://www.spotify.test',[u]),() => ({facts:[{source_url:u,quote:'Spotify is an audio streaming service'}]}))
+		const b = await ask('Backend at Spotify AB')
+		expect(b.company.url).toBe(u)
+		expect(b.facts).toHaveLength(1)
+	})
+
+	it('a guess with no facts falls through too',async () => {
+		const [shop,corp] = ['https://www.spotify.test/','https://corporate.spotify.test/']
+		const facts = (o:LlmCall<any>) => JSON.parse(o.user).pages.some((p:{url:string}) => p.url === corp) ? {facts:[{source_url:corp,quote:'Spotify is an audio streaming service'}]} : {facts:[]}
+		const {ask} = researchApp({[shop]:page('Listen now'),[corp]:page('Spotify is an audio streaming service')},more('Spotify',shop,[corp]),facts)
+		expect((await ask('Backend at Spotify')).company.url).toBe(corp)
+	})
+
+	it('a company host goes before a guess on another host, whatever order the model used',async () => {
+		const [other,own] = ['https://press.test/','https://www.acme.test/']
+		const pages = {[other]:page('Acme Robotics press'),[own]:page('We build robots today')}
+		const {ask,fetchPage} = researchApp(pages,more('Acme Robotics',other,[own]),() => ({facts:[{source_url:own,quote:'We build robots today'}]}))
+		expect((await ask('Backend at Acme Robotics')).company.url).toBe(own)
+		expect(urlsOf(fetchPage)).not.toContain(other)
+	})
+
+	it('a link cut by the link limit does not hide a guess on the same host',async () => {
+		const u = 'https://d.test/'
+		const {ask} = researchApp({[u]:page('Acme Robotics builds robots')},more('Acme Robotics',u,[]))
+		expect((await ask('Acme Robotics https://a.test https://b.test https://c.test https://d.test/x')).company.url).toBe(u)
+	})
+
+	it('other sites follow the same rules as the guess',async () => {
+		const bad = ['https://www.linkedin.com/company/acme','https://jobs.lever.co/acme','http://10.0.0.1/','not a url','https://elsewhere.test/']
+		const {ask,fetchPage,factCalls} = researchApp({'https://elsewhere.test/':page('Nothing about them')},more('Acme',null,bad))
+		const b = await ask('Backend at Acme')
+		expect(b.company.url).toBeNull()
+		expect(factCalls()).toBe(0)
+		expect(urlsOf(fetchPage).every((u) => u.startsWith('https://elsewhere.test'))).toBe(true)
+	})
+
+	it('at most 4 sites are tried for one job description',async () => {
+		const urls = ['a','b','c','d','e','f','g'].map((x) => `https://${x}.acme.test/`)
+		const {ask,factCalls} = researchApp(Object.fromEntries(urls.map((u) => [u,page('Acme Robotics words here')])),more('Acme Robotics',urls[0],urls.slice(1,3)))
+		await ask('Acme Robotics ' + urls.slice(3).join(' '))
+		expect(factCalls()).toBe(4)
+	})
+
+	it('the model is asked for them and can leave them out',async () => {
+		const {ask,llm} = researchApp({},co(null))
+		await ask('Backend at Acme')
+		expect(llm.calls[0].system).toContain('other_urls')
+		expect(llm.calls[0].schema.parse({company_name:null,role_title:null,guess_url:null})).toMatchObject({other_urls:[]})
+	})
+})
+
+describe('research-live-5 : shared hosts',() => {
+	it.each([
+		['Personio','https://www.personio.test/','Personio builds HR software'],
+		['Personio SE & Co. KG','https://www.personio.test/','Personio builds HR software'],
+		['Workday, Inc.','https://www.workday.test/','Workday makes finance software'],
+		['StepStone','https://www.stepstone.test/','StepStone runs job sites'],
+	])('%s on its own host %s counts',async (name,url,line) => {
+		const {ask,fetchPage} = researchApp({[url]:page(line)},co(name,url))
+		const b = await ask('Sales at ' + name)
+		expect(b.company.url).toBe(url)
+		expect(urlsOf(fetchPage)).toContain(url)
+	})
+
+	it('a shared host for another company stays refused',async () => {
+		const {ask,fetchPage} = researchApp({'https://www.stepstone.test/':page('Foo GmbH is hiring')},co('Foo GmbH','https://www.stepstone.test/'))
+		expect((await ask('Sales at Foo GmbH')).company.url).toBeNull()
+		expect(fetchPage).not.toHaveBeenCalled()
+	})
+
+	it('a shared host with the same word as the company still has to name the company',async () => {
+		const u = 'https://www.monster.test/'
+		const {ask} = researchApp({[u]:page('Monster is a job board')},co('Monster Energy',u))
+		expect((await ask('Sales at Monster Energy')).company.url).toBeNull()
+	})
+
+	it.each([
+		['REWE digital GmbH','https://karriere.rewe.test/'],
+		['Acme','https://join.acme.test/'],
+		['Acme','https://karriere.acme.test/'],
+	])('%s keeps its career host %s',async (name,url) => {
+		const {ask} = researchApp({[url]:page('Komm in unser Team')},co(name))
+		expect((await ask(`Backend at ${name}. Apply at ${url}`)).company.url).toBe(url)
+	})
+
+	it.each(['https://www.karriere.at/jobs/1','https://karriere.at/jobs/1','https://join.com/companies/foo','https://www.join.com/companies/foo'])('%s stays a job board',async (link) => {
+		const {ask,fetchPage} = researchApp({[new URL('/',link).href]:page('Foo GmbH is hiring')},co('Foo GmbH'))
+		const b = await ask('Backend at Foo GmbH. Apply at ' + link)
+		expect(b.company.url).toBeNull()
+		expect(fetchPage).not.toHaveBeenCalled()
+	})
+})
+
+describe('browser-contract-2 : a demo needs no relay',() => {
+	it('demo mode starts without an llm config',() => {
+		expect(() => readEnv({DEMO_MODE:'1'})).not.toThrow()
+		expect(() => readEnv({DEMO_MODE:'1',LLM_BASE_URL:'',LLM_API_KEY:''})).not.toThrow()
+	})
+
+	it('real values win and normal mode still needs them',() => {
+		expect(readEnv({DEMO_MODE:'1',LLM_BASE_URL:'http://x.test',LLM_API_KEY:'k'})).toMatchObject({LLM_BASE_URL:'http://x.test',LLM_API_KEY:'k'})
+		expect(() => readEnv({})).toThrow()
+		expect(() => readEnv({DEMO_MODE:'0'})).toThrow()
+	})
+})
+
+describe('tests-1 : /next and a delete',() => {
+	it('/next writes nothing after the delete answered',async () => {
+		const gate = deferred()
+		const llm = sessionFake({grade:() => gradeRun(),next:async () => {
+			await gate.p
+			return {weak:['w1 topic','w2 topic','w3 topic'],new:'n1 topic'}
+		}})
+		const {app} = makeApp({llm})
+		const post = poster(app)
+		const s = await (await post('/session',{user_id:USER,job_description:'Backend'})).json()
+		await post(`/session/${s.id}/transcript`,{turns:TURNS,final:true})
+		expect((await post('/grade',{session_id:s.id})).status).toBe(200)
+		const running = post('/next',{session_id:s.id})
+		await until(() => llm.calls.some((c) => c.name === 'next'))
+		expect((await app.request('/user/' + USER,{method:'DELETE'})).status).toBe(200)
+		gate.ok(null)
+		const res = await running
+		expect(res.status).toBe(404)
+		expect(await (await app.request(`/user/${USER}/export`)).json()).toEqual({jobs:[],facts:[],sessions:[],scores:[],plans:[]})
 	})
 })

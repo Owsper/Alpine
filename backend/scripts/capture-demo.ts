@@ -1,5 +1,6 @@
 // npx tsx --env-file=.env scripts/capture-demo.ts
 // refreshes the facts of the demo company. Nothing else in src/demo changes, so it only ever writes the same company
+// not before a demo : it replaces hand checked facts with verbatim sentences and a run can fail, see the README
 import {randomUUID} from 'node:crypto'
 import {writeFileSync} from 'node:fs'
 import {createApp} from '../src/app'
@@ -30,7 +31,7 @@ if (!res.ok || b.facts.length < MIN_FACTS) {
 }
 const missing = missingClaims(b.facts)
 if (missing.length) {
-	console.error('the question bank depends on claims this run did not return, nothing saved :',missing.join(' | '))
+	console.error('the question bank depends on claims this run did not return, nothing saved. Claims are verbatim sentences and the model picks different ones each run, so try again or keep the stored facts :',missing.join(' | '))
 	process.exit(1)
 }
 

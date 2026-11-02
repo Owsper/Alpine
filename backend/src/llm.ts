@@ -11,6 +11,8 @@ const CONNECT_TRIES = 4
 // the relay key is the same on both models, so these will not get better on the fallback
 const AUTH = [401,402,403]
 const CLIENT_SHARE = 0.2
+// one /grade round is 3 calls, a share below that can never finish one
+const MIN_SHARE = 3
 
 // a demo job stops waiting here and uses canned questions aimed at the same weak dimensions. A healthy /next took 19 to 40 s live
 export const DEMO_MS = 30000
@@ -102,7 +104,7 @@ function toLlmErr(e:unknown) {
 export function createLlm(env:Env,connectMs = 4000):Llm {
 	const dispatcher = new Agent({connect:{timeout:connectMs},keepAliveTimeout:30000})
 	const client = new OpenAI({baseURL:env.LLM_BASE_URL.replace(/\/+$/,'') + '/v1',apiKey:env.LLM_API_KEY,maxRetries:0,fetchOptions:{dispatcher}})
-	const share = Math.ceil(env.LLM_DAILY_CALL_CAP * CLIENT_SHARE)
+	const share = Math.max(MIN_SHARE,Math.ceil(env.LLM_DAILY_CALL_CAP * CLIENT_SHARE))
 	const perClient = new Map<string,number>()
 	let day = ''
 	let used = 0
@@ -122,6 +124,13 @@ export function createLlm(env:Env,connectMs = 4000):Llm {
 		used++
 	}
 
+	// an outage is not the client's doing, retrying through one must not lock it out for the day. The global cap keeps counting
+	function refund() {
+		const who = llmClient.getStore()
+		const mine = who && perClient.get(who)
+		if (who && mine) perClient.set(who,mine - 1)
+	}
+
 	async function call<T>(model:string,o:LlmCall<T>,schema:Record<string,unknown>) {
 		if (o.signal?.aborted) throw cancelled()
 		spend()
@@ -129,7 +138,9 @@ export function createLlm(env:Env,connectMs = 4000):Llm {
 			try {
 				return await send(model,o,schema)
 			} catch(e) {
-				if (i >= CONNECT_TRIES || !connectStall(e)) throw e
+				if (i < CONNECT_TRIES && connectStall(e)) continue
+				refund()
+				throw e
 			}
 		}
 	}

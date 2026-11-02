@@ -2,6 +2,7 @@ import {randomUUID} from 'node:crypto'
 import {z} from 'zod'
 import {Dim,DimScore,Fact,Question,Turn} from './contracts'
 import type {Demo} from './deps'
+import {INTRO} from './session'
 import factsJson from './demo/facts.json'
 import jobJson from './demo/job.json'
 import followupScoreJson from './demo/followup-score.json'
@@ -19,6 +20,9 @@ const Bank = z.object({weak:z.record(Dim,z.tuple([Text,Text])),new:Text})
 
 const sig = (t:Turn[]) => JSON.stringify(t.map((x) => [x.role,x.text]))
 
+// the stored transcripts open with the intro, the flow is what says it
+const spoken = (t:Turn[]) => t.map((x,i) => i ? x : {...x,text:INTRO})
+
 // the question bank quotes these, a refresh of facts.json has to keep them
 export const DEMO_CLAIMS = ['change the relationship people have with money for the better','24 markets worldwide','fully licensed German bank']
 
@@ -28,9 +32,9 @@ export function createDemo():Demo {
 	const company = Company.parse(factsJson)
 	const {role_title,job_description} = SampleJob.parse(jobJson)
 	const questions = z.array(Question).length(5).parse(questionsJson)
-	const turns = z.array(Turn).parse(transcriptJson)
+	const turns = spoken(z.array(Turn).parse(transcriptJson))
 	const graded = Graded.parse(scoreJson)
-	const followup = z.array(Turn).parse(followupJson)
+	const followup = spoken(z.array(Turn).parse(followupJson))
 	const gradedFollowup = Graded.parse(followupScoreJson)
 	const bank = Bank.parse(nextJson)
 	const anchor = questions.find((q) => q.kind === 'anchor')!

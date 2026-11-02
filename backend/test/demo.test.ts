@@ -235,6 +235,7 @@ describe('demo data',() => {
 		const s = await demoSession(post)
 		const said = demo.transcript().filter((t) => t.role === 'interviewer')
 		expect(said.map((t) => [t.text,t.question_id])).toEqual(s.flow.map((f:{text:string,question_id:string|null}) => [f.text,f.question_id]))
+		expect(demo.followupTranscript()[0].text).toBe(s.flow[0].text)
 	})
 
 	it('fallback passes the real grader checks and ranks the same',async () => {

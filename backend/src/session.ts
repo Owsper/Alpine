@@ -1,17 +1,18 @@
 import {randomUUID} from 'node:crypto'
 import {Hono} from 'hono'
 import {z} from 'zod'
-import {Id,Turn,type Fact,type FlowStep,type Job,type PublicSession,type Question,type Session} from './contracts'
+import {Id,Turn,type Fact,type FlowStep,type Job,type PublicSession,type Question,type Session,type Status} from './contracts'
 import type {Deps} from './deps'
 import {ApiErr} from './errors'
 import {DEMO_MS,type Llm,withDeadline} from './llm'
-import {allNew,badQuestion,clean,DISCLAIMER,okText} from './text'
+import {allNew,badQuestion,clean,DISCLAIMER,hasAnswers,okText} from './text'
 import {genOf,stillThere} from './user'
 
 const MAX_TURNS = 300
 const MAX_CHARS = 60000
 const QUESTION_CHARS = 300
 const NUMBER_TRIES = 10
+const OPEN:Status[] = ['created','in_progress']
 
 const NewSession = z.union([
 	z.strictObject({user_id:Id,job_id:Id,demo:z.boolean().optional()}),
@@ -48,7 +49,7 @@ Questions are read aloud, keep each one to one or two short sentences.`
 
 const OUTRO = 'That was the last question, thanks for practicing. Your feedback will be based only on the text of your answers.'
 
-const INTRO = 'I am an AI interviewer, not a human. This is practice only, it is not part of any hiring or selection process, and I am not affiliated with any company mentioned. Only the text transcript of this session is saved, no audio is stored.'
+export const INTRO = 'I am an AI interviewer, not a human. This is practice only, it is not part of any hiring or selection process, and I am not affiliated with any company mentioned. The text transcript of this session is saved with its questions, scores and the job description, no audio is stored.'
 
 export const pub = ({user_id,...s}:Session):PublicSession => s
 
@@ -216,7 +217,11 @@ export function sessionRoutes(deps:Deps) {
 		if (turns.length > MAX_TURNS || chars > MAX_CHARS) {
 			throw new ApiErr('transcript_too_long',`max ${MAX_TURNS} turns and ${MAX_CHARS} chars`,{turns:turns.length,chars})
 		}
-		const up = await store.saveTranscript(id,['created','in_progress'],turns,final ? 'completed' : 'in_progress')
+		const had = await need(id)
+		const stored = had.transcript?.length ?? 0
+		if (turns.length < stored) throw new ApiErr('invalid_state',`${stored} turns are stored, send all of them`,{stored_turns:stored})
+		if (final && OPEN.includes(had.status) && !hasAnswers(turns)) throw new ApiErr('no_candidate_answers','transcript has no candidate answers')
+		const up = await store.saveTranscript(id,OPEN,turns,final ? 'completed' : 'in_progress')
 		if (up) return c.json(pub(up))
 		const s = await need(id)
 		if (sig(s.transcript) === sig(turns)) return c.json(pub(s))
