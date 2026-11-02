@@ -1,0 +1,15 @@
+# torch with CUDA for Whisper on the GPU:
+#   pip install torch --index-url https://download.pytorch.org/whl/cu128
+torch==2.11.0
+fastapi==0.162.0
+uvicorn==0.54.0
+pydantic==2.14.2
+python-dotenv==1.2.4
+python-multipart==0.0.33
+httpx==0.28.1
+numpy==2.5.4
+soundfile==0.14.0
+faster-whisper==1.2.1
+kokoro-onnx==0.6.1
+onnxruntime==1.31.1
+pytest==9.2.0

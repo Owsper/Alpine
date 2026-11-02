@@ -3,7 +3,8 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import SplitText from '../components/SplitText.jsx'
 import VoiceField from '../components/VoiceField.jsx'
-import { cleanFacts, company, isEdited } from '../data.js'
+import { api, toFacts } from '../api.js'
+import { cleanFacts, isEdited } from '../data.js'
 import { useFlow } from '../flow.jsx'
 import { useReducedMotion } from '../motion.js'
 
@@ -12,14 +13,18 @@ const TASK_MS = 480
 
 export default function Research() {
   const reduce = useReducedMotion()
-  const { completeStep, facts, saveFacts } = useFlow()
+  const { completeStep, facts, saveFacts, job, jobId, setIds } = useFlow()
+  const [error, setError] = useState('')
+  const [attempt, setAttempt] = useState(0)
+  const company = job.company || 'the company'
   const [done, setDone] = useState(reduce ? TASKS.length : 0)
   const [draft, setDraft] = useState(null)
   const [status, setStatus] = useState('')
   const draftRef = useRef(null)
   const factsRef = useRef(null)
   const pendingFocus = useRef(null)
-  const finished = done >= TASKS.length
+  // The animation only finishes once the backend has answered (or failed).
+  const finished = done >= TASKS.length && Boolean(jobId || error)
   const editing = draft !== null
   const shownFacts = editing ? draft : facts
   const hasFacts = cleanFacts(shownFacts).length > 0
@@ -27,9 +32,29 @@ export default function Research() {
   // Mirrors the real research step, which takes a few seconds on the backend.
   useEffect(() => {
     if (finished) return undefined
+    // Holds on the last step until the research is back, so the spinner reflects real work.
+    if (done >= TASKS.length - 1 && !jobId && !error) return undefined
     const timer = setTimeout(() => setDone((d) => d + 1), TASK_MS)
     return () => clearTimeout(timer)
-  }, [done, finished])
+  }, [done, finished, jobId, error])
+
+  // Research runs once per job posting; editing the posting clears jobId and triggers it again.
+  useEffect(() => {
+    if (jobId) return undefined
+    let cancelled = false
+    setError('')
+    api.research(job).then(
+      (result) => {
+        if (cancelled) return
+        saveFacts(toFacts(result.facts))
+        setIds({ jobId: result.job.id, sessionId: null, gradedSessionId: null })
+      },
+      (failure) => !cancelled && setError(failure.message),
+    )
+    return () => {
+      cancelled = true
+    }
+  }, [jobId, attempt]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     draftRef.current = draft
@@ -117,7 +142,16 @@ export default function Research() {
 
       {finished && (
         <>
-          <span className="tag tag-amber pop">Demo data</span>
+          {error ? (
+            <p className="call-notice" role="alert">
+              {error}{' '}
+              <button className="link-btn" type="button" onClick={() => setAttempt((n) => n + 1)}>
+                Try again
+              </button>
+            </p>
+          ) : (
+            <span className="tag pop">{facts.length} facts, each with its source</span>
+          )}
           <section className="facts" aria-label="Facts" ref={factsRef}>
             {shownFacts.map((fact, i) => (
               <article className="card fact rise" id={`fact-${fact.id}`} key={fact.id} style={{ '--i': i + 1 }}>
@@ -152,9 +186,13 @@ export default function Research() {
                 {!fact.added && (
                   <small>
                     <span>
-                      <a href={`https://${fact.source}`} target="_blank" rel="noreferrer">
-                        {fact.source}
-                      </a>
+                      {fact.url === null ? (
+                        fact.source
+                      ) : (
+                        <a href={fact.url ?? `https://${fact.source}`} target="_blank" rel="noreferrer">
+                          {fact.source}
+                        </a>
+                      )}
                       {' ·'}
                     </span>
                     <span>retrieved {fact.retrieved}</span>

@@ -1,10 +1,11 @@
 import { ArrowRight, Plus } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import Confetti from '../components/Confetti.jsx'
 import SplitText from '../components/SplitText.jsx'
 import Stat from '../components/Stat.jsx'
-import { averageScore, dimensions, sessionResults } from '../data.js'
+import { api, label } from '../api.js'
+import { dimensions as demoDimensions, sessionResults } from '../data.js'
 import { useFlow } from '../flow.jsx'
 import { buildReportPdf, downloadPdf } from '../reportPdf.js'
 
@@ -26,15 +27,35 @@ function ScoreBar({ label, score, className, from }) {
 
 export default function Progress() {
   const navigate = useNavigate()
-  const { job, startNewPosition, resetInterview, interviewsCompleted } = useFlow()
+  const { job, jobId, startNewPosition, resetInterview, interviewsCompleted } = useFlow()
   const dialogRef = useRef(null)
   const [saveFailed, setSaveFailed] = useState(false)
-  // A comparison needs two finished interviews. Until then only the first one is shown.
-  const latest = Math.max(1, interviewsCompleted)
-  const comparing = latest > 1
-  const previous = comparing ? latest - 1 : 1
-  const firstAverage = averageScore('session1')
-  const secondAverage = averageScore('session2')
+  const [graded, setGraded] = useState(null)
+
+  // Real scores for every graded session of this job; demo numbers only when there are none yet.
+  useEffect(() => {
+    if (!jobId) return setGraded([])
+    api.progress(jobId).then(
+      (result) => setGraded(result.sessions),
+      () => setGraded([]),
+    )
+  }, [jobId])
+
+  const sessions = graded ?? []
+  const demo = sessions.length === 0
+  const last = sessions.at(-1)
+  const before = sessions.at(-2) ?? last
+  const valueOf = (session, dim) => session?.scores.find((s) => s.dimension === dim)?.value ?? 0
+  const dimensions = demo
+    ? demoDimensions
+    : last.scores.map((s) => ({ name: label(s.dimension), session1: valueOf(before, s.dimension), session2: valueOf(last, s.dimension) }))
+  // A comparison needs two finished interviews. Until then only the latest one is shown.
+  const comparing = demo ? interviewsCompleted > 1 : sessions.length > 1
+  const latest = demo ? Math.max(1, interviewsCompleted) : last.number
+  const previous = demo ? (comparing ? latest - 1 : 1) : before.number
+  const averageOf = (key) => dimensions.reduce((sum, d) => sum + d[key], 0) / dimensions.length
+  const firstAverage = averageOf(comparing ? 'session1' : 'session2')
+  const secondAverage = averageOf('session2')
   const title = comparing ? `Progress: session ${previous} vs session ${latest}` : 'Progress: session 1'
 
   function openConfirm() {
@@ -57,7 +78,10 @@ export default function Progress() {
   }
 
   function downloadReport() {
-    const result = sessionResults[Math.min(latest, sessionResults.length) - 1]
+    const ranked = [...dimensions].sort((a, b) => a.session2 - b.session2)
+    const result = demo
+      ? sessionResults[Math.min(latest, sessionResults.length) - 1]
+      : { strongest: ranked.at(-1).name, focus: ranked.slice(0, 2).map((d) => d.name).join(', ') }
     const pdf = buildReportPdf({
       job,
       date: new Date().toLocaleDateString('en-US', { dateStyle: 'long' }),
@@ -81,6 +105,7 @@ export default function Progress() {
   return (
     <div className="page progress">
       <SplitText as="h1" text={title} step={18} />
+      {demo && <span className="tag tag-amber">Demo data until your first graded interview</span>}
       <p className="lede rise" style={{ '--i': 1 }}>
         {comparing
           ? `See how your ${latest === 2 ? 'second' : 'latest'} interview improved after targeted practice.`
@@ -139,7 +164,7 @@ export default function Progress() {
                     <div className="comparison">
                       <ScoreBar label={`Interview ${previous}`} score={d.session1} className="before" />
                       {comparing && (
-                        <ScoreBar label={`Interview ${latest}`} score={d.session2} className="after" from={d.session1 / d.session2} />
+                        <ScoreBar label={`Interview ${latest}`} score={d.session2} className="after" from={d.session2 ? d.session1 / d.session2 : 0} />
                       )}
                     </div>
                   </td>

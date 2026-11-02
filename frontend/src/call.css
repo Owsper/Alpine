@@ -749,3 +749,88 @@
   max-width: 640px;
   row-gap: 8px;
 }
+
+/* Live subtitles of what the interviewer is saying */
+.call-caption {
+  position: absolute;
+  left: 50%;
+  bottom: 56px;
+  z-index: 2;
+  width: min(80%, 720px);
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: rgb(5 10 8 / 0.82);
+  color: var(--ink);
+  font-size: 17px;
+  line-height: 1.45;
+  text-align: center;
+  transform: translateX(-50%);
+}
+
+/* Typed answers: the fallback when the microphone or speech recognition is unavailable */
+.type-answer {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.type-answer input {
+  flex: 1;
+  min-width: 0;
+  padding: 11px 14px;
+  border: 1px solid var(--color-rule);
+  border-radius: 10px;
+  background: var(--color-paper-2);
+  color: var(--ink);
+  font: 400 15px var(--font);
+}
+
+.type-answer input:focus-visible,
+.type-answer button:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 2px;
+}
+
+.type-answer button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--teal);
+  color: var(--on-accent);
+  cursor: pointer;
+}
+
+.type-answer button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* Report: the quote behind every other score */
+.score-quotes {
+  display: grid;
+  margin: 0 0 24px;
+}
+
+.score-quotes li {
+  padding: 10px 0;
+  border-top: 1px solid var(--color-rule);
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.score-quotes b {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 2px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.score-quotes b span {
+  font-family: var(--font-mono);
+  color: var(--teal);
+}

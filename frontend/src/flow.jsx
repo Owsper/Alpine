@@ -3,7 +3,7 @@ import { facts as researchedFacts } from './data.js'
 
 const STORAGE_KEY = 'interviewverse-flow'
 const POSITIONS_KEY = 'interviewverse-positions'
-const INITIAL = { job: { company: '', role: '', posting: '' }, furthest: 0, interviewer: 'male', interviewStartedAt: null, interviewsCompleted: 0, facts: researchedFacts }
+const INITIAL = { job: { company: '', role: '', posting: '' }, furthest: 0, interviewer: 'male', interviewStartedAt: null, interviewsCompleted: 0, facts: researchedFacts, jobId: null, sessionId: null, gradedSessionId: null }
 
 const FlowContext = createContext(null)
 
@@ -64,7 +64,13 @@ export function FlowProvider({ children }) {
         setFlow((current) => ({ ...current, interviewStartedAt: null, interviewsCompleted: current.interviewsCompleted + 1 })),
       // Blanking a required field locks later steps; refilling it restores them. Removing every fact does the same past Research.
       unlocked: jobComplete ? (flow.facts.length > 0 ? flow.furthest : Math.min(flow.furthest, 1)) : 0,
-      setJobField: (name, text) => setFlow((current) => ({ ...current, job: { ...current.job, [name]: text } })),
+      // Ids that link the screens to the backend: the researched job, the current session, the last graded one.
+      jobId: flow.jobId,
+      sessionId: flow.sessionId,
+      gradedSessionId: flow.gradedSessionId,
+      setIds: (ids) => setFlow((current) => ({ ...current, ...ids })),
+      // Editing the posting means new research, so the old job and its sessions no longer apply.
+      setJobField: (name, text) => setFlow((current) => ({ ...current, job: { ...current.job, [name]: text }, jobId: null, sessionId: null, gradedSessionId: null })),
       completeStep: (index) => setFlow((current) => ({ ...current, furthest: Math.max(current.furthest, index + 1) })),
       startNewPosition: (results) => {
         const saved = savePosition({ id: String(Date.now()), savedAt: new Date().toISOString(), job: flow.job, facts: flow.facts, results })

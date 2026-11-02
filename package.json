@@ -1,24 +1,15 @@
 {
   "name": "interviewverse",
   "private": true,
-  "version": "0.0.0",
-  "type": "module",
+  "description": "InterviewVerse: AI voice interview practice. One backend (API + voice models) and one frontend.",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "build:file": "vite build && node scripts/inline-build.mjs",
-    "preview": "vite preview"
-  },
-  "dependencies": {
-    "@fontsource-variable/bricolage-grotesque": "^5.3.0",
-    "@fontsource-variable/inter": "^5.3.0",
-    "lucide-react": "^1.66.0",
-    "react": "^19.3.1",
-    "react-dom": "^19.3.1",
-    "react-router-dom": "^7.18.5"
+    "dev": "concurrently -n api,web -c green,cyan \"npm:backend\" \"npm:frontend\"",
+    "backend": "cd backend && .venv\\Scripts\\python -m uvicorn app.main:app --port 8100",
+    "frontend": "npm --prefix frontend run dev -- --port 5173",
+    "test": "cd backend && .venv\\Scripts\\python -m pytest -q",
+    "build": "npm --prefix frontend run build"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "^6.2.1",
-    "vite": "^8.3.5"
+    "concurrently": "^9.2.1"
   }
 }

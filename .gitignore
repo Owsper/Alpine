@@ -1,2 +1,11 @@
-node_modules
-dist
+node_modules/
+frontend/node_modules/
+frontend/dist/
+backend/.venv/
+backend/.env
+backend/*.db
+backend/models/*.onnx
+backend/models/*.bin
+__pycache__/
+.pytest_cache/
+dev.log
