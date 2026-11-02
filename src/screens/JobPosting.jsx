@@ -1,5 +1,7 @@
+import { ArrowRight, Info } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useFlow } from '../flow.jsx'
 
 const REQUIRED = {
   company: 'Enter the company name.',
@@ -31,59 +33,65 @@ function Field({ name, label, error, as: Control = 'input', ...controlProps }) {
 
 export default function JobPosting() {
   const navigate = useNavigate()
+  const { job, setJobField, completeStep } = useFlow()
   const [errors, setErrors] = useState({})
 
   function handleSubmit(event) {
     event.preventDefault()
-    const form = event.currentTarget
-    const data = new FormData(form)
-    const missing = Object.keys(REQUIRED).filter((name) => !data.get(name).trim())
+    const missing = Object.keys(REQUIRED).filter((name) => !job[name].trim())
 
     setErrors(Object.fromEntries(missing.map((name) => [name, REQUIRED[name]])))
     if (missing.length > 0) {
-      form.elements[missing[0]].focus()
+      event.currentTarget.elements[missing[0]].focus()
       return
     }
+    completeStep(0)
     navigate('/research')
   }
 
-  function clearError(event) {
-    const { name } = event.target
+  function handleChange(event) {
+    const { name, value } = event.target
+    setJobField(name, value)
     setErrors((current) => (current[name] ? { ...current, [name]: undefined } : current))
   }
 
+  function fieldProps(name) {
+    return { name, error: errors[name], value: job[name], onChange: handleChange }
+  }
+
   return (
-    <div className="page">
+    <div className="job-posting">
       <h1>Prepare your interview</h1>
       <p className="lede">Paste a job posting. We research the company and build questions for this exact role.</p>
-      <form className="card prepare-form" onSubmit={handleSubmit} onInput={clearError} noValidate>
+      <form className="card prepare-form" onSubmit={handleSubmit} noValidate>
         <Field
-          name="company"
+          {...fieldProps('company')}
           label="Company"
-          error={errors.company}
           type="text"
           autoComplete="organization"
           placeholder="Acme Robotics"
         />
         <Field
-          name="role"
+          {...fieldProps('role')}
           label="Role"
-          error={errors.role}
           type="text"
           autoComplete="organization-title"
           placeholder="Software engineer, working student"
         />
         <Field
-          name="posting"
+          {...fieldProps('posting')}
           label="Job posting"
-          error={errors.posting}
           as="textarea"
           autoComplete="off"
           placeholder="Paste the posting text or a URL…"
         />
-        <p className="note">We never use your camera. Audio is not stored unless you opt in.</p>
-        <button className="btn btn-primary" type="submit">
+        <p className="note">
+          <Info size={22} strokeWidth={1.5} aria-hidden="true" />
+          We never use your camera. Audio is not stored unless you opt in.
+        </p>
+        <button className="btn btn-primary btn-large" type="submit">
           Prepare interview
+          <ArrowRight size={20} strokeWidth={1.75} aria-hidden="true" />
         </button>
       </form>
     </div>

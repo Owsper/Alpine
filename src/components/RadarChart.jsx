@@ -1,7 +1,7 @@
-const CENTER = { x: 229.5, y: 165 }
-const UNIT = 22 // radius of one score point
+const CENTER = { x: 193, y: 138 }
+const UNIT = 21 // radius of one score point
 const RINGS = [1, 3, 5]
-const LABEL_RADIUS = 132
+const LINE_HEIGHT = 19
 
 function vertex(i, radius) {
   const angle = (i * Math.PI) / 3
@@ -20,19 +20,37 @@ function toPoints(radii) {
     .join(' ')
 }
 
-function labelProps(i) {
-  if (i === 0) return { x: CENTER.x, y: 33, textAnchor: 'middle' }
-  if (i === 3) return { x: CENTER.x, y: 297, textAnchor: 'middle' }
-  const { x, y } = vertex(i, LABEL_RADIUS)
-  return { x, y, textAnchor: i < 3 ? 'start' : 'end' }
+// Labels sit clockwise from the top. Those at the sides wrap, because they have the least room.
+const LABELS = [
+  { x: CENTER.x, y: CENTER.y - 126, textAnchor: 'middle' },
+  { x: CENTER.x + 105, y: CENTER.y - 65, textAnchor: 'start', wrap: true },
+  { x: CENTER.x + 105, y: CENTER.y + 59, textAnchor: 'start', wrap: true },
+  { x: CENTER.x, y: CENTER.y + 124, textAnchor: 'middle' },
+  { x: CENTER.x - 101, y: CENTER.y + 59, textAnchor: 'end', wrap: true },
+  { x: CENTER.x - 101, y: CENTER.y - 65, textAnchor: 'end', wrap: true },
+]
+
+function Label({ name, x, y, wrap, textAnchor }) {
+  const lines = wrap ? name.split(' ') : [name]
+  const top = y - ((lines.length - 1) * LINE_HEIGHT) / 2
+
+  return (
+    <text textAnchor={textAnchor}>
+      {lines.map((line, i) => (
+        <tspan key={line} x={x} y={top + i * LINE_HEIGHT}>
+          {line}
+        </tspan>
+      ))}
+    </text>
+  )
 }
 
 export default function RadarChart({ scores }) {
   const description = scores.map((s) => `${s.name} ${s.score}`).join(', ')
 
   return (
-    <svg className="radar" viewBox="0 0 470 320" role="img" aria-label={`Radar chart out of 5. ${description}.`}>
-      <g fill="none" stroke="#dadad8">
+    <svg className="radar" viewBox="0 0 384 280" role="img" aria-label={`Radar chart out of 5. ${description}.`}>
+      <g fill="none" stroke="#d9dbd8">
         {RINGS.map((ring) => (
           <polygon key={ring} points={toPoints(scores.map(() => ring * UNIT))} />
         ))}
@@ -41,19 +59,22 @@ export default function RadarChart({ scores }) {
           return <line key={s.name} x1={CENTER.x} y1={CENTER.y} x2={x} y2={y} />
         })}
       </g>
-      <polygon
-        className="radar-shape"
-        points={toPoints(scores.map((s) => s.score * UNIT))}
-        fill="#1d9e75"
-        fillOpacity="0.2"
-        stroke="#1d9e75"
-        strokeWidth="2"
-        strokeLinejoin="round"
-      />
+      <g className="radar-shape" style={{ transformOrigin: `${CENTER.x}px ${CENTER.y}px` }}>
+        <polygon
+          points={toPoints(scores.map((s) => s.score * UNIT))}
+          fill="#0a8457"
+          fillOpacity="0.24"
+          stroke="#095f42"
+          strokeWidth="2"
+          strokeLinejoin="round"
+        />
+        {scores.map((s, i) => {
+          const { x, y } = vertex(i, s.score * UNIT)
+          return <circle key={s.name} cx={x} cy={y} r="5" fill="#098457" />
+        })}
+      </g>
       {scores.map((s, i) => (
-        <text key={s.name} {...labelProps(i)}>
-          {s.name}
-        </text>
+        <Label key={s.name} name={s.name} {...LABELS[i]} />
       ))}
     </svg>
   )
