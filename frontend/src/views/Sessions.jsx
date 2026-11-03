@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { api, label } from '../api.js'
 import { CountUp } from '../components/alpine.jsx'
 import { fmtTime, isFiller } from '../dashboard.js'
+import { buildReportPdf, downloadPdf } from '../reportPdf.js'
 
 const BARS = 96
 
@@ -72,14 +73,22 @@ export default function Sessions({ data }) {
               ))}
             </div>
           </div>
-          {selected && <Replay key={selected.sessionId} session={selected} reload={reload} />}
+          {selected && (
+            <Replay
+              key={selected.sessionId}
+              session={selected}
+              // The take before this one for the same job, so the PDF can show the change.
+              previous={sessions.find((s) => s.jobId === selected.jobId && s.graded && s.number < selected.number)}
+              reload={reload}
+            />
+          )}
         </div>
       )}
     </>
   )
 }
 
-function Replay({ session, reload }) {
+function Replay({ session, previous, reload }) {
   const navigate = useNavigate()
   const { duration, words, speaking } = useMemo(() => buildTimeline(session.turns), [session.turns])
   const [pos, setPos] = useState(0)
@@ -141,6 +150,32 @@ function Replay({ session, reload }) {
       setError(failure.message)
       setPlanning(false)
     }
+  }
+
+  function downloadReport() {
+    const scored = session.scores.filter((s) => s.value != null)
+    const before = (dim) => previous?.scores.find((s) => s.dimension === dim)?.value
+    const comparing = previous && scored.every((s) => before(s.dimension) != null)
+    const strongest = [...scored].sort((a, b) => b.value - a.value)[0]
+    const pdf = buildReportPdf({
+      job: { company: session.company, role: session.role },
+      date: new Date(session.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }),
+      title: comparing ? `Take ${previous.number} vs take ${session.number}` : `Interview report, take ${session.number}`,
+      stats: [
+        { label: 'Overall', value: session.overall == null ? '–' : `${session.overall.toFixed(1)} / 5`, good: comparing && session.overall > previous.overall },
+        { label: 'Filler words', value: String(session.fillers) },
+        { label: 'You spoke', value: fmtTime(session.speakingSec) },
+      ],
+      rows: scored.map((s) =>
+        comparing ? { name: label(s.dimension), before: before(s.dimension), after: s.value } : { name: label(s.dimension), before: s.value },
+      ),
+      previous: comparing ? previous.number : session.number,
+      latest: session.number,
+      strongest: strongest ? label(strongest.dimension) : '–',
+      focus: session.weakest ? label(session.weakest.dimension) : '–',
+      focusFix: session.weakest?.fix ?? '',
+    })
+    downloadPdf(pdf, session.company)
   }
 
   const played = Math.floor((pos / Math.max(duration, 1)) * BARS)
@@ -268,6 +303,9 @@ function Replay({ session, reload }) {
           <div className="actions" style={{ marginTop: 18 }}>
             <button className="btn solid" type="button" data-burst onClick={planNext} disabled={planning}>
               <span>{planning ? 'Planning…' : 'Generate my next interview'}</span>
+            </button>
+            <button className="btn ghost" type="button" onClick={downloadReport}>
+              Download report (PDF)
             </button>
           </div>
           <p className="foot-note">Scores are practice guidance from an AI, not a hiring decision. Each one quotes your own words.</p>
