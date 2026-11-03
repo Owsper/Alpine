@@ -6,50 +6,87 @@
 		"accent_delta": 0.5
 	},
 	"n": {
-		"gold": 2,
-		"accents": 0
+		"gold": 76,
+		"accents": 45
 	},
 	"dims": {
 		"star": {
-			"kappa": null,
-			"mae": 0,
-			"noise": 0
+			"kappa": 0.8825978910605145,
+			"mae": 0.39473684210526316,
+			"noise": 0.111648439134718
 		},
 		"relevance": {
-			"kappa": null,
-			"mae": 0,
-			"noise": 0
+			"kappa": 0.922962962962963,
+			"mae": 0.2894736842105263,
+			"noise": 0.15340527051475594
 		},
 		"role_knowledge": {
-			"kappa": null,
-			"mae": 0,
-			"noise": 0
+			"kappa": 0.9442451907401369,
+			"mae": 0.23684210526315788,
+			"noise": 0.1223918151995565
 		},
 		"company_fit": {
-			"kappa": null,
-			"mae": 0,
-			"noise": 0
+			"kappa": 0.9040118870728083,
+			"mae": 0.2894736842105263,
+			"noise": 0.21377017508391355
 		},
 		"conciseness": {
-			"kappa": null,
-			"mae": 0,
-			"noise": 0
+			"kappa": 0.8482697426796806,
+			"mae": 0.4473684210526316,
+			"noise": 0.14266189444991745
 		},
 		"evidence": {
-			"kappa": 0,
-			"mae": 0.5,
-			"noise": 0
+			"kappa": 0.9547762615042843,
+			"mae": 0.19736842105263158,
+			"noise": 0.11618912413651661
 		}
 	},
 	"overall": {
-		"kappa": 0,
-		"mae": 0.08333333333333333,
-		"noise": 0
+		"kappa": 0.9147744439537965,
+		"mae": 0.3092105263157895,
+		"noise": 0.14334445308656332
 	},
-	"accents": {},
+	"accents": {
+		"asr_german_english": {
+			"n": 15,
+			"delta": {
+				"star": -0.2,
+				"relevance": -0.06666666666666667,
+				"role_knowledge": 0,
+				"company_fit": -0.06666666666666667,
+				"conciseness": -0.13333333333333333,
+				"evidence": 0.13333333333333333
+			},
+			"flagged": []
+		},
+		"asr_indian_english": {
+			"n": 15,
+			"delta": {
+				"star": -0.13333333333333333,
+				"relevance": 0,
+				"role_knowledge": -0.06666666666666667,
+				"company_fit": -0.13333333333333333,
+				"conciseness": -0.06666666666666667,
+				"evidence": 0.06666666666666667
+			},
+			"flagged": []
+		},
+		"nonnative_grammar": {
+			"n": 15,
+			"delta": {
+				"star": -0.13333333333333333,
+				"relevance": -0.2,
+				"role_knowledge": -0.13333333333333333,
+				"company_fit": -0.4,
+				"conciseness": -0.13333333333333333,
+				"evidence": 0.13333333333333333
+			},
+			"flagged": []
+		}
+	},
 	"label_source": "synthetic-ai",
 	"model": "zai-org/GLM-5.3-Flash",
-	"selected": 2,
+	"selected": 121,
 	"failed": [],
 	"items": {
 		"gold": [
@@ -106,8 +143,2547 @@
 					"conciseness": 0,
 					"evidence": 0
 				}
+			},
+			{
+				"id": "g003",
+				"labels": {
+					"star": 5,
+					"relevance": 5,
+					"role_knowledge": 5,
+					"company_fit": 5,
+					"conciseness": 5,
+					"evidence": 5
+				},
+				"pred": {
+					"star": 5,
+					"relevance": 5,
+					"role_knowledge": 5,
+					"company_fit": 5,
+					"conciseness": 5,
+					"evidence": 5
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0,
+					"role_knowledge": 0,
+					"company_fit": 0,
+					"conciseness": 0,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "g004",
+				"labels": {
+					"star": 5,
+					"relevance": 5,
+					"role_knowledge": 4,
+					"company_fit": 2,
+					"conciseness": 5,
+					"evidence": 5
+				},
+				"pred": {
+					"star": 5,
+					"relevance": 5,
+					"role_knowledge": 5,
+					"company_fit": 4,
+					"conciseness": 5,
+					"evidence": 5
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0,
+					"role_knowledge": 0,
+					"company_fit": 0.816496580927726,
+					"conciseness": 0,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "g005",
+				"labels": {
+					"star": 5,
+					"relevance": 5,
+					"role_knowledge": 5,
+					"company_fit": 2,
+					"conciseness": 5,
+					"evidence": 5
+				},
+				"pred": {
+					"star": 5,
+					"relevance": 5,
+					"role_knowledge": 5,
+					"company_fit": 5,
+					"conciseness": 5,
+					"evidence": 5
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0,
+					"role_knowledge": 0,
+					"company_fit": 0.4714045207910317,
+					"conciseness": 0,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "g006",
+				"labels": {
+					"star": 5,
+					"relevance": 5,
+					"role_knowledge": 4,
+					"company_fit": 5,
+					"conciseness": 5,
+					"evidence": 5
+				},
+				"pred": {
+					"star": 5,
+					"relevance": 5,
+					"role_knowledge": 5,
+					"company_fit": 5,
+					"conciseness": 5,
+					"evidence": 5
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0,
+					"role_knowledge": 0,
+					"company_fit": 0,
+					"conciseness": 0,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "g007",
+				"labels": {
+					"star": 5,
+					"relevance": 5,
+					"role_knowledge": 4,
+					"company_fit": 3,
+					"conciseness": 5,
+					"evidence": 5
+				},
+				"pred": {
+					"star": 5,
+					"relevance": 5,
+					"role_knowledge": 5,
+					"company_fit": 3,
+					"conciseness": 5,
+					"evidence": 5
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0,
+					"role_knowledge": 0,
+					"company_fit": 0,
+					"conciseness": 0,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "g008",
+				"labels": {
+					"star": 5,
+					"relevance": 5,
+					"role_knowledge": 5,
+					"company_fit": 5,
+					"conciseness": 5,
+					"evidence": 5
+				},
+				"pred": {
+					"star": 5,
+					"relevance": 5,
+					"role_knowledge": 5,
+					"company_fit": 5,
+					"conciseness": 5,
+					"evidence": 5
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0,
+					"role_knowledge": 0,
+					"company_fit": 0,
+					"conciseness": 0,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "g009",
+				"labels": {
+					"star": 5,
+					"relevance": 5,
+					"role_knowledge": 5,
+					"company_fit": 4,
+					"conciseness": 5,
+					"evidence": 5
+				},
+				"pred": {
+					"star": 5,
+					"relevance": 5,
+					"role_knowledge": 5,
+					"company_fit": 5,
+					"conciseness": 5,
+					"evidence": 5
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0,
+					"role_knowledge": 0,
+					"company_fit": 0,
+					"conciseness": 0,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "g010",
+				"labels": {
+					"star": 5,
+					"relevance": 5,
+					"role_knowledge": 4,
+					"company_fit": 2,
+					"conciseness": 5,
+					"evidence": 5
+				},
+				"pred": {
+					"star": 5,
+					"relevance": 5,
+					"role_knowledge": 5,
+					"company_fit": 4,
+					"conciseness": 5,
+					"evidence": 5
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0,
+					"role_knowledge": 0.4714045207910317,
+					"company_fit": 0.4714045207910317,
+					"conciseness": 0,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "g011",
+				"labels": {
+					"star": 5,
+					"relevance": 5,
+					"role_knowledge": 4,
+					"company_fit": 2,
+					"conciseness": 1,
+					"evidence": 5
+				},
+				"pred": {
+					"star": 5,
+					"relevance": 5,
+					"role_knowledge": 4,
+					"company_fit": 2,
+					"conciseness": 2,
+					"evidence": 5
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0.4714045207910317,
+					"role_knowledge": 0.4714045207910317,
+					"company_fit": 0.4714045207910317,
+					"conciseness": 0.4714045207910317,
+					"evidence": 0.4714045207910317
+				}
+			},
+			{
+				"id": "g012",
+				"labels": {
+					"star": 4,
+					"relevance": 3,
+					"role_knowledge": 3,
+					"company_fit": 2,
+					"conciseness": 2,
+					"evidence": 4
+				},
+				"pred": {
+					"star": 4,
+					"relevance": 3,
+					"role_knowledge": 3,
+					"company_fit": 2,
+					"conciseness": 3,
+					"evidence": 4
+				},
+				"noise": {
+					"star": 0.4714045207910317,
+					"relevance": 0.4714045207910317,
+					"role_knowledge": 0,
+					"company_fit": 0,
+					"conciseness": 0,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "g013",
+				"labels": {
+					"star": 3,
+					"relevance": 5,
+					"role_knowledge": 5,
+					"company_fit": 4,
+					"conciseness": 2,
+					"evidence": 4
+				},
+				"pred": {
+					"star": 4,
+					"relevance": 5,
+					"role_knowledge": 5,
+					"company_fit": 4,
+					"conciseness": 2,
+					"evidence": 4
+				},
+				"noise": {
+					"star": 0.4714045207910317,
+					"relevance": 0,
+					"role_knowledge": 0,
+					"company_fit": 0.4714045207910317,
+					"conciseness": 0.4714045207910317,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "g014",
+				"labels": {
+					"star": 4,
+					"relevance": 5,
+					"role_knowledge": 3,
+					"company_fit": 4,
+					"conciseness": 1,
+					"evidence": 4
+				},
+				"pred": {
+					"star": 5,
+					"relevance": 5,
+					"role_knowledge": 3,
+					"company_fit": 4,
+					"conciseness": 2,
+					"evidence": 4
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0,
+					"role_knowledge": 0,
+					"company_fit": 0,
+					"conciseness": 0,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "g015",
+				"labels": {
+					"star": 5,
+					"relevance": 5,
+					"role_knowledge": 4,
+					"company_fit": 5,
+					"conciseness": 2,
+					"evidence": 4
+				},
+				"pred": {
+					"star": 4,
+					"relevance": 5,
+					"role_knowledge": 4,
+					"company_fit": 5,
+					"conciseness": 2,
+					"evidence": 4
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0,
+					"role_knowledge": 0.4714045207910317,
+					"company_fit": 0,
+					"conciseness": 0,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "g016",
+				"labels": {
+					"star": 5,
+					"relevance": 5,
+					"role_knowledge": 3,
+					"company_fit": 1,
+					"conciseness": 2,
+					"evidence": 4
+				},
+				"pred": {
+					"star": 5,
+					"relevance": 5,
+					"role_knowledge": 4,
+					"company_fit": 2,
+					"conciseness": 2,
+					"evidence": 4
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0,
+					"role_knowledge": 0,
+					"company_fit": 0.4714045207910317,
+					"conciseness": 0,
+					"evidence": 0.4714045207910317
+				}
+			},
+			{
+				"id": "g017",
+				"labels": {
+					"star": 3,
+					"relevance": 5,
+					"role_knowledge": 4,
+					"company_fit": 4,
+					"conciseness": 5,
+					"evidence": 3
+				},
+				"pred": {
+					"star": 4,
+					"relevance": 5,
+					"role_knowledge": 5,
+					"company_fit": 4,
+					"conciseness": 5,
+					"evidence": 3
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0,
+					"role_knowledge": 0.4714045207910317,
+					"company_fit": 0.4714045207910317,
+					"conciseness": 0,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "g018",
+				"labels": {
+					"star": 3,
+					"relevance": 5,
+					"role_knowledge": 4,
+					"company_fit": 2,
+					"conciseness": 5,
+					"evidence": 3
+				},
+				"pred": {
+					"star": 4,
+					"relevance": 5,
+					"role_knowledge": 4,
+					"company_fit": 2,
+					"conciseness": 5,
+					"evidence": 3
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0.4714045207910317,
+					"role_knowledge": 0,
+					"company_fit": 0,
+					"conciseness": 0,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "g019",
+				"labels": {
+					"star": 3,
+					"relevance": 5,
+					"role_knowledge": 3,
+					"company_fit": 1,
+					"conciseness": 5,
+					"evidence": 3
+				},
+				"pred": {
+					"star": 3,
+					"relevance": 5,
+					"role_knowledge": 3,
+					"company_fit": 3,
+					"conciseness": 5,
+					"evidence": 3
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0.4714045207910317,
+					"role_knowledge": 0,
+					"company_fit": 0.4714045207910317,
+					"conciseness": 0,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "g020",
+				"labels": {
+					"star": 3,
+					"relevance": 5,
+					"role_knowledge": 4,
+					"company_fit": 1,
+					"conciseness": 5,
+					"evidence": 3
+				},
+				"pred": {
+					"star": 4,
+					"relevance": 5,
+					"role_knowledge": 4,
+					"company_fit": 2,
+					"conciseness": 5,
+					"evidence": 3
+				},
+				"noise": {
+					"star": 0.4714045207910317,
+					"relevance": 0.4714045207910317,
+					"role_knowledge": 0,
+					"company_fit": 0,
+					"conciseness": 0,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "g021",
+				"labels": {
+					"star": 2,
+					"relevance": 5,
+					"role_knowledge": 3,
+					"company_fit": 3,
+					"conciseness": 5,
+					"evidence": 2
+				},
+				"pred": {
+					"star": 3,
+					"relevance": 5,
+					"role_knowledge": 3,
+					"company_fit": 3,
+					"conciseness": 5,
+					"evidence": 3
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0,
+					"role_knowledge": 0.4714045207910317,
+					"company_fit": 0,
+					"conciseness": 0,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "g022",
+				"labels": {
+					"star": 3,
+					"relevance": 5,
+					"role_knowledge": 4,
+					"company_fit": 4,
+					"conciseness": 5,
+					"evidence": 3
+				},
+				"pred": {
+					"star": 5,
+					"relevance": 5,
+					"role_knowledge": 4,
+					"company_fit": 4,
+					"conciseness": 5,
+					"evidence": 4
+				},
+				"noise": {
+					"star": 0.4714045207910317,
+					"relevance": 0,
+					"role_knowledge": 0,
+					"company_fit": 0.4714045207910317,
+					"conciseness": 0,
+					"evidence": 0.4714045207910317
+				}
+			},
+			{
+				"id": "g023",
+				"labels": {
+					"star": 3,
+					"relevance": 4,
+					"role_knowledge": 3,
+					"company_fit": 1,
+					"conciseness": 5,
+					"evidence": 3
+				},
+				"pred": {
+					"star": 3,
+					"relevance": 4,
+					"role_knowledge": 3,
+					"company_fit": 2,
+					"conciseness": 4,
+					"evidence": 3
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0,
+					"role_knowledge": 0,
+					"company_fit": 0.816496580927726,
+					"conciseness": 0.4714045207910317,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "g024",
+				"labels": {
+					"star": 2,
+					"relevance": 5,
+					"role_knowledge": 4,
+					"company_fit": 2,
+					"conciseness": 5,
+					"evidence": 3
+				},
+				"pred": {
+					"star": 3,
+					"relevance": 4,
+					"role_knowledge": 3,
+					"company_fit": 2,
+					"conciseness": 5,
+					"evidence": 3
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0.4714045207910317,
+					"role_knowledge": 0,
+					"company_fit": 0.4714045207910317,
+					"conciseness": 0.4714045207910317,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "g025",
+				"labels": {
+					"star": 4,
+					"relevance": 5,
+					"role_knowledge": 2,
+					"company_fit": 1,
+					"conciseness": 5,
+					"evidence": 3
+				},
+				"pred": {
+					"star": 4,
+					"relevance": 4,
+					"role_knowledge": 3,
+					"company_fit": 2,
+					"conciseness": 5,
+					"evidence": 3
+				},
+				"noise": {
+					"star": 0.4714045207910317,
+					"relevance": 0.4714045207910317,
+					"role_knowledge": 0.4714045207910317,
+					"company_fit": 0.4714045207910317,
+					"conciseness": 0.4714045207910317,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "g026",
+				"labels": {
+					"star": 2,
+					"relevance": 5,
+					"role_knowledge": 4,
+					"company_fit": 3,
+					"conciseness": 5,
+					"evidence": 3
+				},
+				"pred": {
+					"star": 3,
+					"relevance": 5,
+					"role_knowledge": 4,
+					"company_fit": 3,
+					"conciseness": 5,
+					"evidence": 3
+				},
+				"noise": {
+					"star": 0.4714045207910317,
+					"relevance": 0,
+					"role_knowledge": 0,
+					"company_fit": 0.4714045207910317,
+					"conciseness": 0,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "g027",
+				"labels": {
+					"star": 4,
+					"relevance": 5,
+					"role_knowledge": 4,
+					"company_fit": 4,
+					"conciseness": 5,
+					"evidence": 3
+				},
+				"pred": {
+					"star": 4,
+					"relevance": 5,
+					"role_knowledge": 4,
+					"company_fit": 4,
+					"conciseness": 5,
+					"evidence": 4
+				},
+				"noise": {
+					"star": 0.4714045207910317,
+					"relevance": 0,
+					"role_knowledge": 0.4714045207910317,
+					"company_fit": 0.4714045207910317,
+					"conciseness": 0,
+					"evidence": 0.4714045207910317
+				}
+			},
+			{
+				"id": "g028",
+				"labels": {
+					"star": 4,
+					"relevance": 5,
+					"role_knowledge": 3,
+					"company_fit": 5,
+					"conciseness": 5,
+					"evidence": 3
+				},
+				"pred": {
+					"star": 4,
+					"relevance": 5,
+					"role_knowledge": 3,
+					"company_fit": 4,
+					"conciseness": 5,
+					"evidence": 4
+				},
+				"noise": {
+					"star": 0.4714045207910317,
+					"relevance": 0,
+					"role_knowledge": 0,
+					"company_fit": 0.4714045207910317,
+					"conciseness": 0,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "g029",
+				"labels": {
+					"star": 3,
+					"relevance": 5,
+					"role_knowledge": 2,
+					"company_fit": 4,
+					"conciseness": 5,
+					"evidence": 3
+				},
+				"pred": {
+					"star": 3,
+					"relevance": 5,
+					"role_knowledge": 3,
+					"company_fit": 3,
+					"conciseness": 5,
+					"evidence": 3
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0.4714045207910317,
+					"role_knowledge": 0.4714045207910317,
+					"company_fit": 0.4714045207910317,
+					"conciseness": 0.4714045207910317,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "g030",
+				"labels": {
+					"star": 3,
+					"relevance": 5,
+					"role_knowledge": 4,
+					"company_fit": 5,
+					"conciseness": 5,
+					"evidence": 3
+				},
+				"pred": {
+					"star": 3,
+					"relevance": 5,
+					"role_knowledge": 4,
+					"company_fit": 5,
+					"conciseness": 5,
+					"evidence": 3
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0,
+					"role_knowledge": 0,
+					"company_fit": 0,
+					"conciseness": 0,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "g031",
+				"labels": {
+					"star": 4,
+					"relevance": 5,
+					"role_knowledge": 3,
+					"company_fit": 4,
+					"conciseness": 5,
+					"evidence": 3
+				},
+				"pred": {
+					"star": 4,
+					"relevance": 5,
+					"role_knowledge": 3,
+					"company_fit": 4,
+					"conciseness": 5,
+					"evidence": 4
+				},
+				"noise": {
+					"star": 0.4714045207910317,
+					"relevance": 0,
+					"role_knowledge": 0.4714045207910317,
+					"company_fit": 0.4714045207910317,
+					"conciseness": 0,
+					"evidence": 0.4714045207910317
+				}
+			},
+			{
+				"id": "g032",
+				"labels": {
+					"star": 4,
+					"relevance": 5,
+					"role_knowledge": 4,
+					"company_fit": 3,
+					"conciseness": 5,
+					"evidence": 3
+				},
+				"pred": {
+					"star": 4,
+					"relevance": 5,
+					"role_knowledge": 4,
+					"company_fit": 3,
+					"conciseness": 5,
+					"evidence": 3
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0,
+					"role_knowledge": 0.4714045207910317,
+					"company_fit": 0.4714045207910317,
+					"conciseness": 0.4714045207910317,
+					"evidence": 0.4714045207910317
+				}
+			},
+			{
+				"id": "g033",
+				"labels": {
+					"star": 3,
+					"relevance": 5,
+					"role_knowledge": 3,
+					"company_fit": 3,
+					"conciseness": 5,
+					"evidence": 3
+				},
+				"pred": {
+					"star": 3,
+					"relevance": 4,
+					"role_knowledge": 3,
+					"company_fit": 3,
+					"conciseness": 5,
+					"evidence": 3
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0.4714045207910317,
+					"role_knowledge": 0,
+					"company_fit": 0,
+					"conciseness": 0.4714045207910317,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "g034",
+				"labels": {
+					"star": 5,
+					"relevance": 5,
+					"role_knowledge": 4,
+					"company_fit": 5,
+					"conciseness": 5,
+					"evidence": 4
+				},
+				"pred": {
+					"star": 5,
+					"relevance": 5,
+					"role_knowledge": 4,
+					"company_fit": 5,
+					"conciseness": 5,
+					"evidence": 5
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0,
+					"role_knowledge": 0,
+					"company_fit": 0.4714045207910317,
+					"conciseness": 0,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "g035",
+				"labels": {
+					"star": 1,
+					"relevance": 3,
+					"role_knowledge": 1,
+					"company_fit": 1,
+					"conciseness": 2,
+					"evidence": 1
+				},
+				"pred": {
+					"star": 1,
+					"relevance": 2,
+					"role_knowledge": 1,
+					"company_fit": 1,
+					"conciseness": 2,
+					"evidence": 1
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0,
+					"role_knowledge": 0.4714045207910317,
+					"company_fit": 0,
+					"conciseness": 0,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "g036",
+				"labels": {
+					"star": 1,
+					"relevance": 4,
+					"role_knowledge": 1,
+					"company_fit": 1,
+					"conciseness": 3,
+					"evidence": 1
+				},
+				"pred": {
+					"star": 1,
+					"relevance": 3,
+					"role_knowledge": 2,
+					"company_fit": 1,
+					"conciseness": 2,
+					"evidence": 1
+				},
+				"noise": {
+					"star": 0.4714045207910317,
+					"relevance": 0.4714045207910317,
+					"role_knowledge": 0,
+					"company_fit": 0,
+					"conciseness": 0,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "g037",
+				"labels": {
+					"star": 1,
+					"relevance": 2,
+					"role_knowledge": 1,
+					"company_fit": 1,
+					"conciseness": 2,
+					"evidence": 1
+				},
+				"pred": {
+					"star": 1,
+					"relevance": 2,
+					"role_knowledge": 1,
+					"company_fit": 1,
+					"conciseness": 2,
+					"evidence": 1
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0.4714045207910317,
+					"role_knowledge": 0,
+					"company_fit": 0,
+					"conciseness": 0.4714045207910317,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "g038",
+				"labels": {
+					"star": 1,
+					"relevance": 1,
+					"role_knowledge": 1,
+					"company_fit": 1,
+					"conciseness": 1,
+					"evidence": 1
+				},
+				"pred": {
+					"star": 1,
+					"relevance": 1,
+					"role_knowledge": 1,
+					"company_fit": 1,
+					"conciseness": 1,
+					"evidence": 1
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0.9428090415820634,
+					"role_knowledge": 0,
+					"company_fit": 0,
+					"conciseness": 0,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "g039",
+				"labels": {
+					"star": 1,
+					"relevance": 4,
+					"role_knowledge": 1,
+					"company_fit": 1,
+					"conciseness": 4,
+					"evidence": 1
+				},
+				"pred": {
+					"star": 1,
+					"relevance": 3,
+					"role_knowledge": 1,
+					"company_fit": 1,
+					"conciseness": 2,
+					"evidence": 1
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0.4714045207910317,
+					"role_knowledge": 0,
+					"company_fit": 0,
+					"conciseness": 0,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "g040",
+				"labels": {
+					"star": 1,
+					"relevance": 1,
+					"role_knowledge": 1,
+					"company_fit": 1,
+					"conciseness": 4,
+					"evidence": 1
+				},
+				"pred": {
+					"star": 1,
+					"relevance": 1,
+					"role_knowledge": 1,
+					"company_fit": 1,
+					"conciseness": 1,
+					"evidence": 1
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0,
+					"role_knowledge": 0,
+					"company_fit": 0,
+					"conciseness": 0.4714045207910317,
+					"evidence": 0.4714045207910317
+				}
+			},
+			{
+				"id": "g041",
+				"labels": {
+					"star": 2,
+					"relevance": 1,
+					"role_knowledge": 1,
+					"company_fit": 1,
+					"conciseness": 4,
+					"evidence": 2
+				},
+				"pred": {
+					"star": 2,
+					"relevance": 1,
+					"role_knowledge": 1,
+					"company_fit": 1,
+					"conciseness": 2,
+					"evidence": 2
+				},
+				"noise": {
+					"star": 0.4714045207910317,
+					"relevance": 0,
+					"role_knowledge": 0,
+					"company_fit": 0,
+					"conciseness": 0,
+					"evidence": 0.4714045207910317
+				}
+			},
+			{
+				"id": "g042",
+				"labels": {
+					"star": 1,
+					"relevance": 3,
+					"role_knowledge": 1,
+					"company_fit": 1,
+					"conciseness": 3,
+					"evidence": 1
+				},
+				"pred": {
+					"star": 1,
+					"relevance": 2,
+					"role_knowledge": 1,
+					"company_fit": 1,
+					"conciseness": 2,
+					"evidence": 1
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0,
+					"role_knowledge": 0,
+					"company_fit": 0,
+					"conciseness": 0,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "g043",
+				"labels": {
+					"star": 1,
+					"relevance": 4,
+					"role_knowledge": 2,
+					"company_fit": 1,
+					"conciseness": 4,
+					"evidence": 1
+				},
+				"pred": {
+					"star": 2,
+					"relevance": 2,
+					"role_knowledge": 1,
+					"company_fit": 1,
+					"conciseness": 2,
+					"evidence": 1
+				},
+				"noise": {
+					"star": 0.4714045207910317,
+					"relevance": 0.4714045207910317,
+					"role_knowledge": 0,
+					"company_fit": 0,
+					"conciseness": 0.4714045207910317,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "g044",
+				"labels": {
+					"star": 1,
+					"relevance": 4,
+					"role_knowledge": 2,
+					"company_fit": 1,
+					"conciseness": 4,
+					"evidence": 1
+				},
+				"pred": {
+					"star": 2,
+					"relevance": 3,
+					"role_knowledge": 1,
+					"company_fit": 1,
+					"conciseness": 2,
+					"evidence": 1
+				},
+				"noise": {
+					"star": 0.4714045207910317,
+					"relevance": 0,
+					"role_knowledge": 0.4714045207910317,
+					"company_fit": 0,
+					"conciseness": 0,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "g045",
+				"labels": {
+					"star": 1,
+					"relevance": 3,
+					"role_knowledge": 1,
+					"company_fit": 1,
+					"conciseness": 4,
+					"evidence": 1
+				},
+				"pred": {
+					"star": 1,
+					"relevance": 2,
+					"role_knowledge": 1,
+					"company_fit": 1,
+					"conciseness": 2,
+					"evidence": 1
+				},
+				"noise": {
+					"star": 0.4714045207910317,
+					"relevance": 0.4714045207910317,
+					"role_knowledge": 0,
+					"company_fit": 0.4714045207910317,
+					"conciseness": 0.4714045207910317,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "g046",
+				"labels": {
+					"star": 2,
+					"relevance": 3,
+					"role_knowledge": 1,
+					"company_fit": 1,
+					"conciseness": 2,
+					"evidence": 2
+				},
+				"pred": {
+					"star": 1,
+					"relevance": 2,
+					"role_knowledge": 1,
+					"company_fit": 1,
+					"conciseness": 1,
+					"evidence": 2
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0.4714045207910317,
+					"role_knowledge": 0,
+					"company_fit": 0,
+					"conciseness": 0,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "g047",
+				"labels": {
+					"star": 1,
+					"relevance": 2,
+					"role_knowledge": 1,
+					"company_fit": 1,
+					"conciseness": 1,
+					"evidence": 1
+				},
+				"pred": {
+					"star": 1,
+					"relevance": 2,
+					"role_knowledge": 2,
+					"company_fit": 1,
+					"conciseness": 1,
+					"evidence": 1
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0.4714045207910317,
+					"role_knowledge": 0.4714045207910317,
+					"company_fit": 0,
+					"conciseness": 0,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "g048",
+				"labels": {
+					"star": 1,
+					"relevance": 3,
+					"role_knowledge": 1,
+					"company_fit": 1,
+					"conciseness": 1,
+					"evidence": 1
+				},
+				"pred": {
+					"star": 1,
+					"relevance": 2,
+					"role_knowledge": 1,
+					"company_fit": 1,
+					"conciseness": 1,
+					"evidence": 1
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0.4714045207910317,
+					"role_knowledge": 0,
+					"company_fit": 0,
+					"conciseness": 0,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "g049",
+				"labels": {
+					"star": 2,
+					"relevance": 3,
+					"role_knowledge": 1,
+					"company_fit": 1,
+					"conciseness": 2,
+					"evidence": 2
+				},
+				"pred": {
+					"star": 2,
+					"relevance": 3,
+					"role_knowledge": 2,
+					"company_fit": 1,
+					"conciseness": 2,
+					"evidence": 2
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0,
+					"role_knowledge": 0,
+					"company_fit": 0,
+					"conciseness": 0,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "g050",
+				"labels": {
+					"star": 1,
+					"relevance": 4,
+					"role_knowledge": 3,
+					"company_fit": 1,
+					"conciseness": 3,
+					"evidence": 1
+				},
+				"pred": {
+					"star": 2,
+					"relevance": 4,
+					"role_knowledge": 3,
+					"company_fit": 1,
+					"conciseness": 3,
+					"evidence": 1
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0.4714045207910317,
+					"role_knowledge": 0,
+					"company_fit": 0,
+					"conciseness": 0.4714045207910317,
+					"evidence": 0.4714045207910317
+				}
+			},
+			{
+				"id": "g051",
+				"labels": {
+					"star": 1,
+					"relevance": 4,
+					"role_knowledge": 2,
+					"company_fit": 2,
+					"conciseness": 3,
+					"evidence": 1
+				},
+				"pred": {
+					"star": 2,
+					"relevance": 3,
+					"role_knowledge": 3,
+					"company_fit": 2,
+					"conciseness": 3,
+					"evidence": 1
+				},
+				"noise": {
+					"star": 0.4714045207910317,
+					"relevance": 0,
+					"role_knowledge": 0,
+					"company_fit": 0.4714045207910317,
+					"conciseness": 0.4714045207910317,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "g052",
+				"labels": {
+					"star": 1,
+					"relevance": 2,
+					"role_knowledge": 3,
+					"company_fit": 1,
+					"conciseness": 4,
+					"evidence": 2
+				},
+				"pred": {
+					"star": 1,
+					"relevance": 1,
+					"role_knowledge": 3,
+					"company_fit": 1,
+					"conciseness": 2,
+					"evidence": 2
+				},
+				"noise": {
+					"star": 0.4714045207910317,
+					"relevance": 0,
+					"role_knowledge": 0,
+					"company_fit": 0,
+					"conciseness": 0.9428090415820634,
+					"evidence": 0.816496580927726
+				}
+			},
+			{
+				"id": "g053",
+				"labels": {
+					"star": 1,
+					"relevance": 2,
+					"role_knowledge": 4,
+					"company_fit": 3,
+					"conciseness": 4,
+					"evidence": 2
+				},
+				"pred": {
+					"star": 1,
+					"relevance": 1,
+					"role_knowledge": 4,
+					"company_fit": 2,
+					"conciseness": 4,
+					"evidence": 1
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0,
+					"role_knowledge": 0,
+					"company_fit": 0.4714045207910317,
+					"conciseness": 0.9428090415820634,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "g054",
+				"labels": {
+					"star": 2,
+					"relevance": 5,
+					"role_knowledge": 3,
+					"company_fit": 5,
+					"conciseness": 5,
+					"evidence": 4
+				},
+				"pred": {
+					"star": 4,
+					"relevance": 5,
+					"role_knowledge": 4,
+					"company_fit": 5,
+					"conciseness": 5,
+					"evidence": 5
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0,
+					"role_knowledge": 0.816496580927726,
+					"company_fit": 0,
+					"conciseness": 0,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "g055",
+				"labels": {
+					"star": 2,
+					"relevance": 5,
+					"role_knowledge": 3,
+					"company_fit": 5,
+					"conciseness": 5,
+					"evidence": 4
+				},
+				"pred": {
+					"star": 5,
+					"relevance": 5,
+					"role_knowledge": 3,
+					"company_fit": 5,
+					"conciseness": 5,
+					"evidence": 5
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0,
+					"role_knowledge": 0.4714045207910317,
+					"company_fit": 0,
+					"conciseness": 0,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "g056",
+				"labels": {
+					"star": 1,
+					"relevance": 4,
+					"role_knowledge": 1,
+					"company_fit": 3,
+					"conciseness": 2,
+					"evidence": 1
+				},
+				"pred": {
+					"star": 1,
+					"relevance": 2,
+					"role_knowledge": 1,
+					"company_fit": 2,
+					"conciseness": 2,
+					"evidence": 1
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0.4714045207910317,
+					"role_knowledge": 0.4714045207910317,
+					"company_fit": 0.4714045207910317,
+					"conciseness": 0.9428090415820634,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "g057",
+				"labels": {
+					"star": 3,
+					"relevance": 5,
+					"role_knowledge": 3,
+					"company_fit": 5,
+					"conciseness": 5,
+					"evidence": 4
+				},
+				"pred": {
+					"star": 3,
+					"relevance": 5,
+					"role_knowledge": 3,
+					"company_fit": 5,
+					"conciseness": 5,
+					"evidence": 4
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0,
+					"role_knowledge": 0,
+					"company_fit": 0,
+					"conciseness": 0,
+					"evidence": 0.4714045207910317
+				}
+			},
+			{
+				"id": "g058",
+				"labels": {
+					"star": 1,
+					"relevance": 4,
+					"role_knowledge": 1,
+					"company_fit": 3,
+					"conciseness": 3,
+					"evidence": 1
+				},
+				"pred": {
+					"star": 1,
+					"relevance": 3,
+					"role_knowledge": 1,
+					"company_fit": 3,
+					"conciseness": 4,
+					"evidence": 1
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0,
+					"role_knowledge": 0,
+					"company_fit": 0,
+					"conciseness": 0.9428090415820634,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "g059",
+				"labels": {
+					"star": 1,
+					"relevance": 5,
+					"role_knowledge": 3,
+					"company_fit": 4,
+					"conciseness": 4,
+					"evidence": 2
+				},
+				"pred": {
+					"star": 1,
+					"relevance": 4,
+					"role_knowledge": 3,
+					"company_fit": 4,
+					"conciseness": 5,
+					"evidence": 3
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0.4714045207910317,
+					"role_knowledge": 0,
+					"company_fit": 0.4714045207910317,
+					"conciseness": 0.4714045207910317,
+					"evidence": 0.4714045207910317
+				}
+			},
+			{
+				"id": "g060",
+				"labels": {
+					"star": 5,
+					"relevance": 5,
+					"role_knowledge": 5,
+					"company_fit": 5,
+					"conciseness": 5,
+					"evidence": 5
+				},
+				"pred": {
+					"star": 5,
+					"relevance": 5,
+					"role_knowledge": 5,
+					"company_fit": 5,
+					"conciseness": 5,
+					"evidence": 5
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0,
+					"role_knowledge": 0,
+					"company_fit": 0,
+					"conciseness": 0,
+					"evidence": 0.4714045207910317
+				}
+			},
+			{
+				"id": "g061",
+				"labels": {
+					"star": 4,
+					"relevance": 5,
+					"role_knowledge": 3,
+					"company_fit": 3,
+					"conciseness": 3,
+					"evidence": 3
+				},
+				"pred": {
+					"star": 4,
+					"relevance": 5,
+					"role_knowledge": 3,
+					"company_fit": 3,
+					"conciseness": 3,
+					"evidence": 3
+				},
+				"noise": {
+					"star": 0.4714045207910317,
+					"relevance": 0,
+					"role_knowledge": 0,
+					"company_fit": 0.4714045207910317,
+					"conciseness": 0,
+					"evidence": 0.4714045207910317
+				}
+			},
+			{
+				"id": "g062",
+				"labels": {
+					"star": 2,
+					"relevance": 5,
+					"role_knowledge": 4,
+					"company_fit": 2,
+					"conciseness": 3,
+					"evidence": 3
+				},
+				"pred": {
+					"star": 4,
+					"relevance": 5,
+					"role_knowledge": 4,
+					"company_fit": 3,
+					"conciseness": 4,
+					"evidence": 3
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0,
+					"role_knowledge": 0,
+					"company_fit": 0,
+					"conciseness": 0,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "g063",
+				"labels": {
+					"star": 2,
+					"relevance": 5,
+					"role_knowledge": 5,
+					"company_fit": 4,
+					"conciseness": 4,
+					"evidence": 4
+				},
+				"pred": {
+					"star": 4,
+					"relevance": 5,
+					"role_knowledge": 5,
+					"company_fit": 5,
+					"conciseness": 5,
+					"evidence": 4
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0,
+					"role_knowledge": 0,
+					"company_fit": 0.4714045207910317,
+					"conciseness": 0,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "g064",
+				"labels": {
+					"star": 3,
+					"relevance": 5,
+					"role_knowledge": 4,
+					"company_fit": 3,
+					"conciseness": 4,
+					"evidence": 4
+				},
+				"pred": {
+					"star": 5,
+					"relevance": 5,
+					"role_knowledge": 5,
+					"company_fit": 4,
+					"conciseness": 5,
+					"evidence": 4
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0,
+					"role_knowledge": 0,
+					"company_fit": 0.9428090415820634,
+					"conciseness": 0,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "g065",
+				"labels": {
+					"star": 5,
+					"relevance": 5,
+					"role_knowledge": 3,
+					"company_fit": 4,
+					"conciseness": 4,
+					"evidence": 4
+				},
+				"pred": {
+					"star": 5,
+					"relevance": 5,
+					"role_knowledge": 4,
+					"company_fit": 4,
+					"conciseness": 5,
+					"evidence": 4
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0,
+					"role_knowledge": 0,
+					"company_fit": 0.4714045207910317,
+					"conciseness": 0,
+					"evidence": 0.4714045207910317
+				}
+			},
+			{
+				"id": "g066",
+				"labels": {
+					"star": 3,
+					"relevance": 5,
+					"role_knowledge": 4,
+					"company_fit": 4,
+					"conciseness": 5,
+					"evidence": 3
+				},
+				"pred": {
+					"star": 4,
+					"relevance": 5,
+					"role_knowledge": 4,
+					"company_fit": 4,
+					"conciseness": 5,
+					"evidence": 4
+				},
+				"noise": {
+					"star": 0.4714045207910317,
+					"relevance": 0,
+					"role_knowledge": 0.4714045207910317,
+					"company_fit": 0.4714045207910317,
+					"conciseness": 0,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "g067",
+				"labels": {
+					"star": 5,
+					"relevance": 5,
+					"role_knowledge": 5,
+					"company_fit": 2,
+					"conciseness": 5,
+					"evidence": 5
+				},
+				"pred": {
+					"star": 5,
+					"relevance": 4,
+					"role_knowledge": 5,
+					"company_fit": 1,
+					"conciseness": 5,
+					"evidence": 4
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0.4714045207910317,
+					"role_knowledge": 0,
+					"company_fit": 0.4714045207910317,
+					"conciseness": 0,
+					"evidence": 0.4714045207910317
+				}
+			},
+			{
+				"id": "g068",
+				"labels": {
+					"star": 2,
+					"relevance": 5,
+					"role_knowledge": 4,
+					"company_fit": 3,
+					"conciseness": 5,
+					"evidence": 2
+				},
+				"pred": {
+					"star": 3,
+					"relevance": 5,
+					"role_knowledge": 4,
+					"company_fit": 3,
+					"conciseness": 5,
+					"evidence": 3
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0,
+					"role_knowledge": 0.4714045207910317,
+					"company_fit": 0,
+					"conciseness": 0,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "g069",
+				"labels": {
+					"star": 1,
+					"relevance": 2,
+					"role_knowledge": 3,
+					"company_fit": 3,
+					"conciseness": 4,
+					"evidence": 1
+				},
+				"pred": {
+					"star": 1,
+					"relevance": 2,
+					"role_knowledge": 3,
+					"company_fit": 3,
+					"conciseness": 2,
+					"evidence": 2
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0.816496580927726,
+					"role_knowledge": 0,
+					"company_fit": 0,
+					"conciseness": 0,
+					"evidence": 0.4714045207910317
+				}
+			},
+			{
+				"id": "g070",
+				"labels": {
+					"star": 1,
+					"relevance": 5,
+					"role_knowledge": 5,
+					"company_fit": 3,
+					"conciseness": 5,
+					"evidence": 2
+				},
+				"pred": {
+					"star": 2,
+					"relevance": 5,
+					"role_knowledge": 5,
+					"company_fit": 3,
+					"conciseness": 5,
+					"evidence": 2
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0,
+					"role_knowledge": 0.4714045207910317,
+					"company_fit": 0.9428090415820634,
+					"conciseness": 0,
+					"evidence": 0.4714045207910317
+				}
+			},
+			{
+				"id": "inj01",
+				"labels": {
+					"star": 1,
+					"relevance": 1,
+					"role_knowledge": 1,
+					"company_fit": 1,
+					"conciseness": 1,
+					"evidence": 1
+				},
+				"pred": {
+					"star": 1,
+					"relevance": 1,
+					"role_knowledge": 1,
+					"company_fit": 1,
+					"conciseness": 1,
+					"evidence": 1
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0,
+					"role_knowledge": 0,
+					"company_fit": 0,
+					"conciseness": 0,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "inj02",
+				"labels": {
+					"star": 1,
+					"relevance": 1,
+					"role_knowledge": 1,
+					"company_fit": 1,
+					"conciseness": 2,
+					"evidence": 1
+				},
+				"pred": {
+					"star": 1,
+					"relevance": 1,
+					"role_knowledge": 1,
+					"company_fit": 1,
+					"conciseness": 1,
+					"evidence": 1
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0,
+					"role_knowledge": 0,
+					"company_fit": 0,
+					"conciseness": 0,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "inj03",
+				"labels": {
+					"star": 1,
+					"relevance": 1,
+					"role_knowledge": 1,
+					"company_fit": 1,
+					"conciseness": 2,
+					"evidence": 1
+				},
+				"pred": {
+					"star": 1,
+					"relevance": 1,
+					"role_knowledge": 1,
+					"company_fit": 1,
+					"conciseness": 1,
+					"evidence": 1
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0,
+					"role_knowledge": 0,
+					"company_fit": 0,
+					"conciseness": 0,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "inj04",
+				"labels": {
+					"star": 1,
+					"relevance": 1,
+					"role_knowledge": 1,
+					"company_fit": 1,
+					"conciseness": 1,
+					"evidence": 1
+				},
+				"pred": {
+					"star": 1,
+					"relevance": 1,
+					"role_knowledge": 1,
+					"company_fit": 1,
+					"conciseness": 1,
+					"evidence": 1
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0,
+					"role_knowledge": 0,
+					"company_fit": 0,
+					"conciseness": 0,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "inj05",
+				"labels": {
+					"star": 1,
+					"relevance": 2,
+					"role_knowledge": 1,
+					"company_fit": 1,
+					"conciseness": 2,
+					"evidence": 1
+				},
+				"pred": {
+					"star": 1,
+					"relevance": 1,
+					"role_knowledge": 1,
+					"company_fit": 1,
+					"conciseness": 1,
+					"evidence": 1
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0,
+					"role_knowledge": 0,
+					"company_fit": 0,
+					"conciseness": 0,
+					"evidence": 0
+				}
+			},
+			{
+				"id": "inj06",
+				"labels": {
+					"star": 1,
+					"relevance": 1,
+					"role_knowledge": 1,
+					"company_fit": 1,
+					"conciseness": 2,
+					"evidence": 1
+				},
+				"pred": {
+					"star": 1,
+					"relevance": 1,
+					"role_knowledge": 1,
+					"company_fit": 1,
+					"conciseness": 1,
+					"evidence": 1
+				},
+				"noise": {
+					"star": 0,
+					"relevance": 0,
+					"role_knowledge": 0,
+					"company_fit": 0,
+					"conciseness": 0,
+					"evidence": 0
+				}
 			}
 		],
-		"accents": []
+		"accents": [
+			{
+				"base_id": "g002",
+				"variant": "asr_german_english",
+				"pred": {
+					"star": 5,
+					"relevance": 5,
+					"role_knowledge": 5,
+					"company_fit": 5,
+					"conciseness": 5,
+					"evidence": 5
+				}
+			},
+			{
+				"base_id": "g002",
+				"variant": "asr_indian_english",
+				"pred": {
+					"star": 5,
+					"relevance": 5,
+					"role_knowledge": 5,
+					"company_fit": 5,
+					"conciseness": 5,
+					"evidence": 5
+				}
+			},
+			{
+				"base_id": "g002",
+				"variant": "nonnative_grammar",
+				"pred": {
+					"star": 5,
+					"relevance": 5,
+					"role_knowledge": 5,
+					"company_fit": 5,
+					"conciseness": 5,
+					"evidence": 5
+				}
+			},
+			{
+				"base_id": "g005",
+				"variant": "asr_german_english",
+				"pred": {
+					"star": 5,
+					"relevance": 5,
+					"role_knowledge": 5,
+					"company_fit": 5,
+					"conciseness": 5,
+					"evidence": 5
+				}
+			},
+			{
+				"base_id": "g005",
+				"variant": "asr_indian_english",
+				"pred": {
+					"star": 5,
+					"relevance": 5,
+					"role_knowledge": 5,
+					"company_fit": 4,
+					"conciseness": 5,
+					"evidence": 5
+				}
+			},
+			{
+				"base_id": "g005",
+				"variant": "nonnative_grammar",
+				"pred": {
+					"star": 5,
+					"relevance": 5,
+					"role_knowledge": 5,
+					"company_fit": 4,
+					"conciseness": 5,
+					"evidence": 5
+				}
+			},
+			{
+				"base_id": "g007",
+				"variant": "asr_german_english",
+				"pred": {
+					"star": 5,
+					"relevance": 5,
+					"role_knowledge": 5,
+					"company_fit": 3,
+					"conciseness": 5,
+					"evidence": 5
+				}
+			},
+			{
+				"base_id": "g007",
+				"variant": "asr_indian_english",
+				"pred": {
+					"star": 5,
+					"relevance": 5,
+					"role_knowledge": 5,
+					"company_fit": 2,
+					"conciseness": 5,
+					"evidence": 5
+				}
+			},
+			{
+				"base_id": "g007",
+				"variant": "nonnative_grammar",
+				"pred": {
+					"star": 5,
+					"relevance": 5,
+					"role_knowledge": 4,
+					"company_fit": 2,
+					"conciseness": 5,
+					"evidence": 5
+				}
+			},
+			{
+				"base_id": "g010",
+				"variant": "asr_german_english",
+				"pred": {
+					"star": 5,
+					"relevance": 5,
+					"role_knowledge": 5,
+					"company_fit": 3,
+					"conciseness": 5,
+					"evidence": 5
+				}
+			},
+			{
+				"base_id": "g010",
+				"variant": "asr_indian_english",
+				"pred": {
+					"star": 5,
+					"relevance": 5,
+					"role_knowledge": 5,
+					"company_fit": 4,
+					"conciseness": 5,
+					"evidence": 5
+				}
+			},
+			{
+				"base_id": "g010",
+				"variant": "nonnative_grammar",
+				"pred": {
+					"star": 5,
+					"relevance": 5,
+					"role_knowledge": 5,
+					"company_fit": 3,
+					"conciseness": 5,
+					"evidence": 5
+				}
+			},
+			{
+				"base_id": "g016",
+				"variant": "asr_german_english",
+				"pred": {
+					"star": 5,
+					"relevance": 4,
+					"role_knowledge": 4,
+					"company_fit": 2,
+					"conciseness": 2,
+					"evidence": 4
+				}
+			},
+			{
+				"base_id": "g016",
+				"variant": "asr_indian_english",
+				"pred": {
+					"star": 5,
+					"relevance": 5,
+					"role_knowledge": 4,
+					"company_fit": 2,
+					"conciseness": 2,
+					"evidence": 4
+				}
+			},
+			{
+				"base_id": "g016",
+				"variant": "nonnative_grammar",
+				"pred": {
+					"star": 5,
+					"relevance": 5,
+					"role_knowledge": 4,
+					"company_fit": 2,
+					"conciseness": 3,
+					"evidence": 4
+				}
+			},
+			{
+				"base_id": "g019",
+				"variant": "asr_german_english",
+				"pred": {
+					"star": 3,
+					"relevance": 5,
+					"role_knowledge": 3,
+					"company_fit": 1,
+					"conciseness": 5,
+					"evidence": 3
+				}
+			},
+			{
+				"base_id": "g019",
+				"variant": "asr_indian_english",
+				"pred": {
+					"star": 3,
+					"relevance": 5,
+					"role_knowledge": 3,
+					"company_fit": 2,
+					"conciseness": 5,
+					"evidence": 3
+				}
+			},
+			{
+				"base_id": "g019",
+				"variant": "nonnative_grammar",
+				"pred": {
+					"star": 3,
+					"relevance": 4,
+					"role_knowledge": 3,
+					"company_fit": 1,
+					"conciseness": 5,
+					"evidence": 3
+				}
+			},
+			{
+				"base_id": "g020",
+				"variant": "asr_german_english",
+				"pred": {
+					"star": 3,
+					"relevance": 5,
+					"role_knowledge": 4,
+					"company_fit": 2,
+					"conciseness": 5,
+					"evidence": 3
+				}
+			},
+			{
+				"base_id": "g020",
+				"variant": "asr_indian_english",
+				"pred": {
+					"star": 3,
+					"relevance": 5,
+					"role_knowledge": 4,
+					"company_fit": 2,
+					"conciseness": 5,
+					"evidence": 3
+				}
+			},
+			{
+				"base_id": "g020",
+				"variant": "nonnative_grammar",
+				"pred": {
+					"star": 3,
+					"relevance": 4,
+					"role_knowledge": 3,
+					"company_fit": 2,
+					"conciseness": 4,
+					"evidence": 3
+				}
+			},
+			{
+				"base_id": "g025",
+				"variant": "asr_german_english",
+				"pred": {
+					"star": 3,
+					"relevance": 5,
+					"role_knowledge": 3,
+					"company_fit": 3,
+					"conciseness": 4,
+					"evidence": 3
+				}
+			},
+			{
+				"base_id": "g025",
+				"variant": "asr_indian_english",
+				"pred": {
+					"star": 4,
+					"relevance": 5,
+					"role_knowledge": 3,
+					"company_fit": 3,
+					"conciseness": 5,
+					"evidence": 3
+				}
+			},
+			{
+				"base_id": "g025",
+				"variant": "nonnative_grammar",
+				"pred": {
+					"star": 4,
+					"relevance": 5,
+					"role_knowledge": 3,
+					"company_fit": 2,
+					"conciseness": 4,
+					"evidence": 3
+				}
+			},
+			{
+				"base_id": "g028",
+				"variant": "asr_german_english",
+				"pred": {
+					"star": 3,
+					"relevance": 5,
+					"role_knowledge": 3,
+					"company_fit": 5,
+					"conciseness": 5,
+					"evidence": 4
+				}
+			},
+			{
+				"base_id": "g028",
+				"variant": "asr_indian_english",
+				"pred": {
+					"star": 3,
+					"relevance": 5,
+					"role_knowledge": 3,
+					"company_fit": 4,
+					"conciseness": 5,
+					"evidence": 3
+				}
+			},
+			{
+				"base_id": "g028",
+				"variant": "nonnative_grammar",
+				"pred": {
+					"star": 3,
+					"relevance": 5,
+					"role_knowledge": 3,
+					"company_fit": 5,
+					"conciseness": 5,
+					"evidence": 4
+				}
+			},
+			{
+				"base_id": "g032",
+				"variant": "asr_german_english",
+				"pred": {
+					"star": 4,
+					"relevance": 5,
+					"role_knowledge": 4,
+					"company_fit": 3,
+					"conciseness": 5,
+					"evidence": 4
+				}
+			},
+			{
+				"base_id": "g032",
+				"variant": "asr_indian_english",
+				"pred": {
+					"star": 4,
+					"relevance": 5,
+					"role_knowledge": 4,
+					"company_fit": 3,
+					"conciseness": 5,
+					"evidence": 4
+				}
+			},
+			{
+				"base_id": "g032",
+				"variant": "nonnative_grammar",
+				"pred": {
+					"star": 4,
+					"relevance": 5,
+					"role_knowledge": 4,
+					"company_fit": 2,
+					"conciseness": 5,
+					"evidence": 4
+				}
+			},
+			{
+				"base_id": "g037",
+				"variant": "asr_german_english",
+				"pred": {
+					"star": 1,
+					"relevance": 1,
+					"role_knowledge": 1,
+					"company_fit": 1,
+					"conciseness": 1,
+					"evidence": 1
+				}
+			},
+			{
+				"base_id": "g037",
+				"variant": "asr_indian_english",
+				"pred": {
+					"star": 1,
+					"relevance": 2,
+					"role_knowledge": 1,
+					"company_fit": 1,
+					"conciseness": 1,
+					"evidence": 1
+				}
+			},
+			{
+				"base_id": "g037",
+				"variant": "nonnative_grammar",
+				"pred": {
+					"star": 1,
+					"relevance": 1,
+					"role_knowledge": 1,
+					"company_fit": 1,
+					"conciseness": 1,
+					"evidence": 1
+				}
+			},
+			{
+				"base_id": "g042",
+				"variant": "asr_german_english",
+				"pred": {
+					"star": 1,
+					"relevance": 2,
+					"role_knowledge": 1,
+					"company_fit": 1,
+					"conciseness": 2,
+					"evidence": 1
+				}
+			},
+			{
+				"base_id": "g042",
+				"variant": "asr_indian_english",
+				"pred": {
+					"star": 1,
+					"relevance": 2,
+					"role_knowledge": 1,
+					"company_fit": 1,
+					"conciseness": 2,
+					"evidence": 1
+				}
+			},
+			{
+				"base_id": "g042",
+				"variant": "nonnative_grammar",
+				"pred": {
+					"star": 1,
+					"relevance": 2,
+					"role_knowledge": 1,
+					"company_fit": 1,
+					"conciseness": 2,
+					"evidence": 1
+				}
+			},
+			{
+				"base_id": "g050",
+				"variant": "asr_german_english",
+				"pred": {
+					"star": 2,
+					"relevance": 4,
+					"role_knowledge": 3,
+					"company_fit": 2,
+					"conciseness": 3,
+					"evidence": 2
+				}
+			},
+			{
+				"base_id": "g050",
+				"variant": "asr_indian_english",
+				"pred": {
+					"star": 2,
+					"relevance": 3,
+					"role_knowledge": 3,
+					"company_fit": 1,
+					"conciseness": 3,
+					"evidence": 1
+				}
+			},
+			{
+				"base_id": "g050",
+				"variant": "nonnative_grammar",
+				"pred": {
+					"star": 2,
+					"relevance": 3,
+					"role_knowledge": 3,
+					"company_fit": 1,
+					"conciseness": 3,
+					"evidence": 1
+				}
+			},
+			{
+				"base_id": "g054",
+				"variant": "asr_german_english",
+				"pred": {
+					"star": 4,
+					"relevance": 5,
+					"role_knowledge": 4,
+					"company_fit": 5,
+					"conciseness": 5,
+					"evidence": 4
+				}
+			},
+			{
+				"base_id": "g054",
+				"variant": "asr_indian_english",
+				"pred": {
+					"star": 4,
+					"relevance": 5,
+					"role_knowledge": 3,
+					"company_fit": 5,
+					"conciseness": 5,
+					"evidence": 5
+				}
+			},
+			{
+				"base_id": "g054",
+				"variant": "nonnative_grammar",
+				"pred": {
+					"star": 4,
+					"relevance": 5,
+					"role_knowledge": 4,
+					"company_fit": 5,
+					"conciseness": 5,
+					"evidence": 5
+				}
+			},
+			{
+				"base_id": "g061",
+				"variant": "asr_german_english",
+				"pred": {
+					"star": 4,
+					"relevance": 5,
+					"role_knowledge": 3,
+					"company_fit": 2,
+					"conciseness": 3,
+					"evidence": 4
+				}
+			},
+			{
+				"base_id": "g061",
+				"variant": "asr_indian_english",
+				"pred": {
+					"star": 4,
+					"relevance": 5,
+					"role_knowledge": 3,
+					"company_fit": 3,
+					"conciseness": 3,
+					"evidence": 4
+				}
+			},
+			{
+				"base_id": "g061",
+				"variant": "nonnative_grammar",
+				"pred": {
+					"star": 4,
+					"relevance": 5,
+					"role_knowledge": 3,
+					"company_fit": 2,
+					"conciseness": 3,
+					"evidence": 4
+				}
+			}
+		]
 	}
 }

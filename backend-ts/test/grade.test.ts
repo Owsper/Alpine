@@ -455,6 +455,32 @@ describe('a user deleted during grading',() => {
 		expect(await store.getSession(s.id)).toBeNull()
 	})
 
+	it('a delete landing in saveScore gets not_found too',async () => {
+		const {app,store} = makeApp({llm:fakeLlm({grade:async () => flat(3)})})
+		const s = await seed(store)
+		const save = store.saveScore.bind(store)
+		store.saveScore = async (x) => {
+			await app.request('/user/' + s.user_id,{method:'DELETE'})
+			return save(x)
+		}
+		const res = await post(app,s.id)
+		expect(res.status).toBe(404)
+		expect((await res.json()).error).toMatchObject({code:'not_found',retryable:false})
+	})
+
+	it('a delete just before the claim gets not_found, not a retryable conflict',async () => {
+		const {app,store} = makeApp({llm:fakeLlm({grade:async () => flat(3)})})
+		const s = await seed(store)
+		const get = store.getScore.bind(store)
+		store.getScore = async (id) => {
+			await app.request('/user/' + s.user_id,{method:'DELETE'})
+			return get(id)
+		}
+		const res = await post(app,s.id)
+		expect(res.status).toBe(404)
+		expect((await res.json()).error).toMatchObject({code:'not_found',retryable:false})
+	})
+
 	it('a delete of another user changes nothing',async () => {
 		const ctx:{del?:() => unknown} = {}
 		const llm = fakeLlm({grade:async () => {

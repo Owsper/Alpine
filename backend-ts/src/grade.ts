@@ -217,7 +217,10 @@ export function gradeRoutes(deps:Deps) {
 		const turns = s.transcript ?? []
 		if (!hasAnswers(turns)) throw new ApiErr('no_candidate_answers','transcript has no candidate answers')
 		const claim = deps.now()
-		if (!await store.claimGrading(id,LEASE_MS,claim)) throw new ApiErr('grading_in_progress','grading is already running')
+		if (!await store.claimGrading(id,LEASE_MS,claim)) {
+			stillThere(deps,s.user_id,gen)
+			throw new ApiErr('grading_in_progress','grading is already running')
+		}
 
 		try {
 			const made = await makeScore(deps,s,turns)
@@ -227,6 +230,7 @@ export function gradeRoutes(deps:Deps) {
 			return c.json(score)
 		} catch(e) {
 			await release(id,claim.toISOString())
+			stillThere(deps,s.user_id,gen)
 			throw e
 		}
 	})
