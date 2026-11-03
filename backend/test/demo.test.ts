@@ -6,6 +6,7 @@ import jobJson from '../src/demo/job.json'
 import {ApiErr,type Code} from '../src/errors'
 import {safeFetch} from '../src/fetch'
 import {runGrader} from '../src/grade'
+import type {Store} from '../src/store/types'
 import {fakeLlm,makeApp} from './helpers'
 
 vi.mock('../src/fetch',async (orig) => ({
@@ -86,7 +87,7 @@ describe('whole flow with the llm and the network down',() => {
 		expect(g.session_id).toBe(s.id)
 		expect(g.weakest).toEqual(['star','evidence'])
 		expect(g.progress).toBeNull()
-		expect(llm.calls.map((c) => c.name)).toContain('grade')
+		expect(llm.calls).toEqual([])
 
 		const after = await (await app.request(`/session/${s.id}`)).json()
 		expect(after.session.status).toBe('graded')
@@ -105,7 +106,7 @@ describe('whole flow with the llm and the network down',() => {
 			['new',null],
 		])
 		expect(n.questions[3].text).toBe(s.questions.find((q) => q.kind === 'anchor')!.text)
-		expect(llm.calls.map((c) => c.name)).toContain('next')
+		expect(llm.calls).toEqual([])
 
 		expect(await (await post('/grade',{session_id:s.id})).json()).toEqual(g)
 		expect((await (await post('/next',{session_id:s.id})).json()).plan).toEqual(plan)
@@ -119,6 +120,143 @@ describe('whole flow with the llm and the network down',() => {
 		const s = await res.json()
 		expect(s.questions).toEqual(demo.firstQuestions())
 		expect(llm.calls).toEqual([])
+	})
+})
+
+describe('the demo loop is coherent whatever the llm does',() => {
+	const healthy = () => fakeLlm({
+		next:() => ({weak:['Live weak one?','Live weak two?','Live weak three?'],new:'Live new one?'}),
+	})
+	const graded = async (store:Store,id:string,turns?:Turn[]) => {
+		await store.saveScore(demo.gradeFallback(id,new Date(),turns))
+		await store.updateSession(id,['completed'],{status:'graded'})
+	}
+	const asked = (t:{role:string,text:string}[]) => t.filter((x) => x.role === 'interviewer').map((x) => x.text)
+	const steps = (s:{flow:{text:string}[]}) => s.flow.map((f) => f.text)
+
+	it('/next on the canned first transcript skips a healthy llm, and the follow-up lines up word for word',async () => {
+		const llm = healthy()
+		const {app,store} = makeApp({llm,demo})
+		const post = poster(app)
+		const s = await demoSession(post)
+		await post(`/session/${s.id}/transcript`,{turns:demo.transcript(),final:true})
+		await graded(store,s.id)
+
+		const res = await post('/next',{session_id:s.id})
+		expect(res.status).toBe(200)
+		const {session:n} = await res.json()
+		expect(llm.calls).toEqual([])
+		expect(steps(n)).toEqual(asked(demo.followupTranscript()))
+		const anchor = (o:{questions:Question[]}) => o.questions.find((q) => q.kind === 'anchor')!
+		expect(anchor(n).text).toBe(anchor(s).text)
+		expect(anchor(n).id).not.toBe(anchor(s).id)
+	})
+
+	it('/next on the canned follow-up transcript skips the llm too',async () => {
+		const llm = healthy()
+		const {app,store} = makeApp({llm,demo})
+		const post = poster(app)
+		const s = await demoSession(post)
+		await post(`/session/${s.id}/transcript`,{turns:demo.followupTranscript(),final:true})
+		await graded(store,s.id,demo.followupTranscript())
+		expect((await post('/next',{session_id:s.id})).status).toBe(200)
+		expect(llm.calls).toEqual([])
+	})
+
+	// the live grader picked evidence, star and star, role_knowledge on this transcript, each of those breaks the follow-up
+	const elsewhere = (turns:Turn[]) => fakeLlm({grade:() => {
+		const quote = turns.find((t) => t.role === 'candidate')!.text.split(' ').slice(0,4).join(' ')
+		return {scores:DIMS.map((dimension) => ({dimension,score:dimension === 'role_knowledge' ? 1 : 3,evidence_quote:quote,tip:'Say what you did yourself'}))}
+	}})
+
+	it('the whole canned loop lines up with a healthy grader that would pick another pair, with no llm call',async () => {
+		const llm = elsewhere(demo.transcript())
+		const {app} = makeApp({llm,demo})
+		const post = poster(app)
+		const s = await demoSession(post)
+		await post(`/session/${s.id}/transcript`,{turns:demo.transcript(),final:true})
+
+		const g = await (await post('/grade',{session_id:s.id})).json()
+		expect(g).toMatchObject({fallback:true,weakest:['star','evidence'],progress:null})
+		expect(g.scores).toEqual(demo.gradeFallback(s.id,new Date()).scores)
+
+		const {session:n} = await (await post('/next',{session_id:s.id})).json()
+		expect(steps(n)).toEqual(asked(demo.followupTranscript()))
+		await post(`/session/${n.id}/transcript`,{turns:demo.followupTranscript(),final:true})
+
+		const g2 = await (await post('/grade',{session_id:n.id})).json()
+		expect(g2.fallback).toBe(true)
+		expect(g2.scores).toEqual(demo.gradeFallback(n.id,new Date(),demo.followupTranscript()).scores)
+		expect(g2.progress.map((p:{dimension:Dim,prev:number,cur:number}) => [p.dimension,p.prev,p.cur])).toEqual([
+			['star',2,4],
+			['relevance',4,4],
+			['role_knowledge',3,4],
+			['company_fit',3,3],
+			['conciseness',4,4],
+			['evidence',2,4],
+		])
+		expect(llm.calls).toEqual([])
+	})
+
+	it('a live transcript on a demo job is graded live',async () => {
+		const llm = elsewhere(OTHER)
+		const {app} = makeApp({llm,demo})
+		const post = poster(app)
+		const s = await demoSession(post)
+		await post(`/session/${s.id}/transcript`,{turns:OTHER,final:true})
+		const g = await (await post('/grade',{session_id:s.id})).json()
+		expect(g.fallback).toBe(false)
+		expect(g.weakest).toEqual(['role_knowledge','star'])
+		expect(llm.calls).toHaveLength(3)
+	})
+
+	it('a live transcript on a demo job still asks the llm',async () => {
+		const llm = healthy()
+		const {app,store} = makeApp({llm,demo})
+		const post = poster(app)
+		const s = await demoSession(post)
+		await post(`/session/${s.id}/transcript`,{turns:OTHER,final:true})
+		await graded(store,s.id)
+		const {session:n} = await (await post('/next',{session_id:s.id})).json()
+		expect(llm.calls.map((c) => c.name)).toEqual(['next'])
+		expect(n.questions[0].text).toBe('Live weak one?')
+	})
+
+	it('a live transcript on a demo job gets the bank when the llm fails',async () => {
+		const {app,store,llm} = makeApp({llm:failing('llm_unavailable'),demo})
+		const post = poster(app)
+		const s = await demoSession(post)
+		await post(`/session/${s.id}/transcript`,{turns:OTHER,final:true})
+		await graded(store,s.id)
+		const {session:n} = await (await post('/next',{session_id:s.id})).json()
+		expect(llm.calls.map((c) => c.name)).toEqual(['next'])
+		expect(steps(n)).toEqual(asked(demo.followupTranscript()))
+	})
+
+	it('a canned transcript on a job that is not demo still asks the llm',async () => {
+		const llm = fakeLlm({
+			session:() => ({questions:demo.firstQuestions().map((q) => ({text:q.text,is_anchor:q.kind === 'anchor'}))}),
+			next:() => ({weak:['Live weak one?','Live weak two?','Live weak three?'],new:'Live new one?'}),
+		})
+		const {app,store} = makeApp({llm,demo})
+		const post = poster(app)
+		const s = await (await post('/session',{user_id:USER,job_description:'Backend Engineer at Acme.'})).json()
+		await post(`/session/${s.id}/transcript`,{turns:demo.transcript(),final:true})
+		await graded(store,s.id)
+		const {session:n} = await (await post('/next',{session_id:s.id})).json()
+		expect(n.questions[0].text).toBe('Live weak one?')
+	})
+})
+
+describe('GET /demo',() => {
+	it('has the company and the role the form needs, from the stored research',async () => {
+		const {app} = setup()
+		const b = await (await app.request('/demo')).json()
+		const r = demo.research()
+		expect(b).toMatchObject({company_name:r.company_name,role_title:r.role_title,job_description:r.job_description,company_url:r.company_url})
+		expect(b.company_name).toBe('N26')
+		expect(b.role_title).toBe('Backend Engineer')
+		expect(Object.keys(b).sort()).toEqual(['company_name','company_url','followup_transcript','job_description','role_title','transcript'])
 	})
 })
 

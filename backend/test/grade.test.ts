@@ -438,6 +438,36 @@ describe('progress',() => {
 	})
 })
 
+describe('a user deleted during grading',() => {
+	it('gets not_found like the other routes and stores nothing',async () => {
+		const ctx:{del?:() => unknown} = {}
+		const llm = fakeLlm({grade:async () => {
+			await ctx.del?.()
+			return flat(3)
+		}})
+		const {app,store} = makeApp({llm})
+		const s = await seed(store)
+		ctx.del = () => app.request('/user/' + s.user_id,{method:'DELETE'})
+		const res = await post(app,s.id)
+		expect(res.status).toBe(404)
+		expect((await res.json()).error).toMatchObject({code:'not_found',retryable:false})
+		expect(await store.getScore(s.id)).toBeNull()
+		expect(await store.getSession(s.id)).toBeNull()
+	})
+
+	it('a delete of another user changes nothing',async () => {
+		const ctx:{del?:() => unknown} = {}
+		const llm = fakeLlm({grade:async () => {
+			await ctx.del?.()
+			return flat(3)
+		}})
+		const {app,store} = makeApp({llm})
+		const s = await seed(store)
+		ctx.del = () => app.request('/user/' + crypto.randomUUID(),{method:'DELETE'})
+		expect((await post(app,s.id)).status).toBe(200)
+	})
+})
+
 describe('demo fallback',() => {
 	const failing = () => fakeLlm({grade() {throw down()}})
 	const other:Turn[] = [{role:'candidate',text:'A different answer from a real user.'}]
@@ -445,23 +475,28 @@ describe('demo fallback',() => {
 	it.each([
 		['provider failure',() => failing()],
 		['bad output',() => fakeLlm({grade:() => flat(3,{evidence_quote:'made up'})})],
-	])('uses the fallback for the demo transcript on %s',async (label,mk) => {
-		const {app,store} = makeApp({llm:mk(),demo:fakeDemo()})
+		['a healthy provider',() => fakeLlm({grade:() => flat(4)})],
+	])('the demo transcript gets its canned score with no llm call on %s',async (label,mk) => {
+		const llm = mk()
+		const {app,store} = makeApp({llm,demo:fakeDemo()})
 		const s = await seed(store,{demo:true})
 		const res = await post(app,s.id)
 		expect(res.status).toBe(200)
 		const body = await res.json()
 		expect(body).toMatchObject({session_id:s.id,fallback:true})
+		expect(llm.calls).toEqual([])
 		expect((await store.getSession(s.id))?.status).toBe('graded')
 		expect(await store.getScore(s.id)).toEqual(body)
 	})
 
-	it('real grading wins when the provider works',async () => {
-		const {app,store} = makeApp({llm:fakeLlm({grade:() => flat(4)}),demo:fakeDemo()})
-		const s = await seed(store,{demo:true})
+	it('another transcript on a demo job is graded live',async () => {
+		const llm = fakeLlm({grade:() => run([4,4,4,4,4,4],{evidence_quote:'A different answer'})})
+		const {app,store} = makeApp({llm,demo:fakeDemo()})
+		const s = await seed(store,{demo:true,transcript:other})
 		const body = await (await post(app,s.id)).json()
 		expect(body.fallback).toBe(false)
 		expect(body.scores[0].score).toBe(4)
+		expect(llm.calls).toHaveLength(3)
 	})
 
 	it('never for another transcript on a demo job',async () => {

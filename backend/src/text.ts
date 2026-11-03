@@ -14,7 +14,13 @@ export const BANNED = /\b(anxious|anxiety|nervous\w*|(un)?confiden(t|ce|tly)(?! 
 
 const PROTECTED = /\b(how old|your age|are you (married|pregnant|single)|(your|have) (kids|children|spouse|husband|wife|religion|family|health|nationality|ethnicity)|do you have (kids|children)|where are you from)\b/i
 
-export const badQuestion = (s:string) => BANNED.test(s) || PROTECTED.test(s)
+// the intro says not affiliated, so a question can not talk as the company. Questions follow the language of the job. US in capitals is the country
+const AS_COMPANY = /(?<![\p{L}\p{N}])(we|our|ours|ourselves|wir|uns|unser\p{L}*|nous|notre|nos)(?![\p{L}\p{N}])/iu
+const AS_COMPANY_US = /(?<![\p{L}\p{N}])[Uu]s(?![\p{L}\p{N}])/u
+
+export const NOT_THE_COMPANY = 'Never speak as the company or its hiring team, you do not work there. Never use we, us, our or here for it, or the same words in any other language, even where the job description or facts do. Use its name, or say this role or this team.'
+
+export const badQuestion = (s:string) => BANNED.test(s) || PROTECTED.test(s) || AS_COMPANY.test(s) || AS_COMPANY_US.test(s)
 
 const same = (s:string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim()
 

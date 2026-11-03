@@ -6,6 +6,7 @@ import type {Deps} from './deps'
 import {ApiErr} from './errors'
 import {type Llm,withDeadline} from './llm'
 import {BANNED,HAS_TEXT,hasAnswers} from './text'
+import {genOf,stillThere} from './user'
 
 export type GradeRun = {scores:Omit<DimScore,'noise'>[]}
 export type GradeInput = {description:string,facts:Fact[],questions:Question[],turns:Turn[]}
@@ -14,8 +15,6 @@ export type GradeResult = {scores:DimScore[],strengths:Dim[],weakest:[Dim,Dim],r
 const LEASE_MS = 5 * 60 * 1000
 // a round must end inside its lease, or a second grader starts next to it
 const ROUND_MS = LEASE_MS - 30000
-// the demo transcript stops waiting here and gets its canned score. Longer than a healthy round, those took 17 to 37 s live
-const DEMO_GRADE_MS = 45000
 const ATTEMPTS = 3
 const MIN_QUOTE_WORDS = 2
 // reasoning eats the budget : glm hit 13k without the "work quickly" line, up to 7.5k with it
@@ -174,15 +173,13 @@ async function calcProgress(deps:Deps,s:Session,scores:DimScore[]):Promise<Progr
 async function makeScore(deps:Deps,s:Session,turns:Turn[]):Promise<Score> {
 	const job = await deps.store.getJob(s.job_id)
 	if (!job) throw new ApiErr('not_found','job not found')
-	const canned = job.demo && !!deps.demo?.isDemoTranscript(turns)
 	let base
-	try {
+	// live rounds on the first transcript also gave evidence, star and star, role_knowledge as the weakest pair, and then /next asks what followup_transcript never answers. The canned score was captured from the grader and the transcript is canned too
+	if (job.demo && deps.demo?.isDemoTranscript(turns)) base = deps.demo.gradeFallback(s.id,deps.now(),turns)
+	else {
 		const facts = await deps.store.getFacts(job.id)
-		const {scores,strengths,weakest} = await withDeadline(canned ? DEMO_GRADE_MS : ROUND_MS,(signal) => runGrader(deps.llm,{description:job.description,facts,questions:s.questions,turns},signal))
+		const {scores,strengths,weakest} = await withDeadline(ROUND_MS,(signal) => runGrader(deps.llm,{description:job.description,facts,questions:s.questions,turns},signal))
 		base = {session_id:s.id,scores,strengths,weakest,fallback:false,graded_at:deps.now().toISOString()}
-	} catch(e) {
-		if (!canned || !deps.demo) throw e
-		base = deps.demo.gradeFallback(s.id,deps.now(),turns)
 	}
 	return {...base,progress:await calcProgress(deps,s,base.scores)}
 }
@@ -206,6 +203,7 @@ export function gradeRoutes(deps:Deps) {
 		const {session_id:id} = Body.parse(await c.req.json())
 		const s = await store.getSession(id)
 		if (!s) throw new ApiErr('not_found','session not found')
+		const gen = genOf(deps,s.user_id)
 
 		const had = await store.getScore(id)
 		if (had) {
@@ -222,7 +220,9 @@ export function gradeRoutes(deps:Deps) {
 		if (!await store.claimGrading(id,LEASE_MS,claim)) throw new ApiErr('grading_in_progress','grading is already running')
 
 		try {
-			const score = await store.saveScore(await makeScore(deps,s,turns))
+			const made = await makeScore(deps,s,turns)
+			stillThere(deps,s.user_id,gen)
+			const score = await store.saveScore(made)
 			await store.updateSession(id,['completed'],{status:'graded'})
 			return c.json(score)
 		} catch(e) {

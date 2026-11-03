@@ -1,5 +1,5 @@
 import type {Fact,Job,Plan,Score,Session,Status} from '../contracts'
-import type {SessionPatch,Store} from './types'
+import {type SessionPatch,type Store,stampAfter} from './types'
 
 type FactRow = Fact & {job_id:string,company_key:string|null}
 
@@ -93,8 +93,9 @@ export function memStore():Store {
 			return update(id,from,patch)
 		},
 
-		async saveTranscript(id,from,turns,toStatus) {
-			return update(id,from,{transcript:turns,status:toStatus})
+		async saveTranscript(id,from,turns,toStatus,seen) {
+			if (sessions.get(id)?.updated_at !== seen) return null
+			return update(id,from,{transcript:turns,status:toStatus,updated_at:stampAfter(seen)})
 		},
 
 		async claimGrading(id,leaseMs,now) {

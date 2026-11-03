@@ -13,11 +13,12 @@ export type Io = {
 	resolve(host:string):Promise<Addr[]>
 	get(u:URL,addrs:Addr[],signal:AbortSignal):Promise<Raw>
 }
-export type FetchOpts = {io?:Io,robots?:Map<string,Promise<string>>,timeoutMs?:number,parse?:typeof parseHtml}
+export type FetchOpts = {io?:Io,robots?:Map<string,Promise<string|null>>,timeoutMs?:number,parse?:typeof parseHtml}
 
 const UA = 'InterviewVerseBot/0.1'
 const TIMEOUT = 8000
-const MAX_BYTES = 1024 * 1024
+// atlassian's home page is 2.08 MB and infineon's 1.59 MB, cut at 1 MB they had no visible text left
+const MAX_BYTES = 3 * 1024 * 1024
 const MAX_HOPS = 3
 const REDIRECTS = [301,302,303,307,308]
 const DENY_ALL = 'User-agent: *\nDisallow: /'
@@ -52,7 +53,8 @@ export function isPrivate(ip:string) {
 
 const hostOf = (u:URL) => u.hostname.replace(/^\[|\]$/g,'').replace(/\.$/,'')
 
-export const keyOf = (u:URL) => hostOf(u).replace(/^www\./,'')
+// a site can send an english reader to en.acme.com, and that is still the site
+export const keyOf = (u:URL) => hostOf(u).replace(/^www\.|^en\.(?=.*\.)/,'')
 
 export function checkUrl(raw:string,key?:string) {
 	const u = URL.parse(raw)
@@ -71,7 +73,8 @@ export const realIo:Io = {
 	get(u,addrs,signal) {
 		// connect only to the addresses we checked, a second dns answer could point anywhere
 		const pinned:LookupFunction = (h,o,cb) => o.all ? cb(null,addrs) : cb(null,addrs[0].address,addrs[0].family)
-		const headers = {'user-agent':UA,accept:'text/html,text/plain;q=0.9,*/*;q=0.1','accept-encoding':'identity'}
+		// without a language some sites go by ip, stripe gave an english job all german facts. bolt goes by ip whatever this says
+		const headers = {'user-agent':UA,accept:'text/html,text/plain;q=0.9,*/*;q=0.1','accept-language':'en','accept-encoding':'identity'}
 		return new Promise((done,fail) => {
 			const req = (u.protocol === 'https:' ? https : http).request(u,{lookup:pinned,signal,agent:false,headers},(res) => {
 				const enc = res.headers['content-encoding']
@@ -181,19 +184,20 @@ async function follow(start:string,key:string,io:Io,signal:AbortSignal,guard?:(u
 	throw new Error('too_many_redirects')
 }
 
+// null is no answer : a server error, a dead connection or a redirect off the site. The page stays unread, but that is not the site saying no
 async function loadRobots(url:string,key:string,io:Io,signal:AbortSignal) {
-	let txt = DENY_ALL
 	try {
 		const r = await follow(url,key,io,signal)
-		if (r.status === 404) txt = ''
-		if (r.status === 200) txt = r.body
+		if (r.status === 404) return ''
+		if (r.status === 200) return r.body
+		if (r.status === 403 || r.status === 429) return DENY_ALL
 	} catch {}
-	return txt
+	return null
 }
 
 export async function safeFetch(url:string,companyKey?:string,o:FetchOpts = {}):Promise<Fetched> {
 	const io = o.io ?? realIo
-	const robots = o.robots ?? new Map<string,Promise<string>>()
+	const robots = o.robots ?? new Map<string,Promise<string|null>>()
 	const key = companyKey ?? keyOf(checkUrl(url))
 	const signal = AbortSignal.timeout(o.timeoutMs ?? TIMEOUT)
 	const timedOut = new Promise<never>((ok,no) => signal.addEventListener('abort',() => no(new Error('timeout'))))
@@ -202,6 +206,7 @@ export async function safeFetch(url:string,companyKey?:string,o:FetchOpts = {}):
 		const r = await follow(url,key,io,signal,async (u) => {
 			if (!robots.has(u.origin)) robots.set(u.origin,loadRobots(u.origin + '/robots.txt',key,io,signal))
 			const txt = await robots.get(u.origin)
+			if (txt === null) throw new Error('robots_unknown')
 			if (txt && !await robotsAllow(txt,u.href,signal)) throw new Error('robots')
 		})
 		if (r.status !== 200) throw new Error('status_' + r.status)

@@ -25,8 +25,9 @@ The landing page calls nothing. On the second pass the Score from step 6 has `pr
 - **Click handlers, not effects.** `main.jsx:17` uses `StrictMode`, which runs effects twice in dev. `/research` and `/session` are not idempotent, so an effect makes two jobs and pays the LLM twice. Step 6 has to run on arrival, so guard it with a ref : a second `/grade` at the same time gets `grading_in_progress`.
 - **Going back.** `/start` stays reachable. Call `/research` again only if the text changed, every call makes a new job.
 - **Reload.** `session_id` is enough, `GET /session/:id` returns the session, score, job, facts and disclaimer. `created` or `in_progress` means Interview, `completed` means Report and run step 6, `graded` means Report with the returned `score`. After step 7 the graded session is `session.source_session_id`.
-- **Reload during an interview.** The turns are in memory, so they are gone after a refresh and `flow.jsx` keeps the interview going. Before any save, seed the turns from `session.transcript` (null means `[]`) and resume at the first `flow` step of type `question` whose `question_id` has no candidate turn. Never start from an empty list : a shorter save and End session both get `invalid_state` with `details.stored_turns`, and once the new list reaches the stored length it **silently replaces the earlier answers**.
-- **Waits**, from a few runs : `/research` 4 to 23 s, `/session` 13 to 23 s, `/grade` 17 to 37 s, `/next` 19 to 40 s. Details in [api.md](api.md#timing).
+- **Reload, id is gone.** On `not_found` for a stored `session_id` or `job_id`, clear `job_id` and `session_id` from the flow state, keep `user_id`, and go back to `/start`. A restart of a server on the memory store causes this, it loses everything, and demo mode always uses that store.
+- **Reload during an interview.** The turns are in memory, so they are gone after a refresh and `flow.jsx` keeps the interview going. Before any save, seed the turns from `session.transcript` (null means `[]`) and resume at the first `flow` step of type `question` whose `question_id` has no candidate turn. Never start from an empty list : a shorter save and End session both get `invalid_state` with `details.stored_turns`, and so does a list that reaches the stored length with different answers, with `details.changed_turn` as well. Reload on those, do not resend with `replace:true`. That flag is only for a screen where the user corrects an answer.
+- **Waits**, from a few runs : `/research` 4 to 23 s, `/session` 13 to 23 s, `/grade` 17 to 69 s, `/next` 19 to 40 s. Details in [api.md](api.md#timing).
 
 ## Field map
 
@@ -142,13 +143,15 @@ The research, section 7, says "the camera is not used", while the landing page c
 
 The form requires company and role (`JobPosting.jsx:9-13`), but `/research` only takes `job_description` and drops unknown fields without an error. The LLM reads the company and role out of the text, and the demo posting names neither. The form also offers "the posting text or a URL" (`JobPosting.jsx:12,147`), but the backend never reads a posting from a url : a url in the text only counts as a candidate for the company site, and job board hosts never do.
 
-**Recommend** : send `` `${role} at ${company}\n\n${posting}` `` as `job_description`, change the copy to text only, add an optional company website field for `company_url`, since that is the only sure way to get the right site, and cap the textarea so the whole text stays under 20000 chars. Omit `company_url` when the field is blank and add `https://` when no scheme was typed : `''`, `acme.test` and `www.acme.test` get a plain `bad_request`, so the "ask for another url" handling of `source_not_allowed` never runs for them.
+**Required** : cap the textarea so the whole text stays under 20000 chars. A longer text gets `bad_request`, and a paste far over the 256 KB body limit can fail as a bare `TypeError` with no error envelope, see the [fetch helper](#fetch-helper).
+
+**Recommend** : send `` `${role} at ${company}\n\n${posting}` `` as `job_description`, change the copy to text only, and add an optional company website field for `company_url`, since that is the only sure way to get the right site. Omit `company_url` when the field is blank and add `https://` when no scheme was typed : `''`, `acme.test` and `www.acme.test` get a plain `bad_request`, so the "ask for another url" handling of `source_not_allowed` never runs for them.
 
 ### D9. No facts found
 
-The UI refuses to start without a fact and asks the user to write one (`Research.jsx:176-198`, `flow.jsx:66`). `/research` can return 200 with `facts:[]` and a warning, `no_official_source` or `no_sourced_facts`, and the job is usable. [api.md](api.md#what-the-frontend-owns) says to show the warning and not fill the gap.
+The UI refuses to start without a fact and asks the user to write one (`Research.jsx:176-198`, `flow.jsx:66`). `/research` can return 200 with `facts:[]` and a warning, `no_official_source` or `no_sourced_facts`, and the job is usable. `source_refused` comes on top of one of those when the company's site said no to us (robots.txt, 403, 429 or an AI opt-out) and nothing of it was read. [api.md](api.md#what-the-frontend-owns) says to show the warning and not fill the gap.
 
-**Recommend** : allow the start with no facts and show the warning. `INITIAL.facts` starts empty, not from the mock (`flow.jsx:6`).
+**Recommend** : allow the start with no facts and show the warning. Check `source_refused` first and say the company's site does not allow automated reading, because "no official source" reads as if the company has no site. `INITIAL.facts` starts empty, not from the mock (`flow.jsx:6`).
 
 ### D10. AI badge disappears
 
@@ -170,9 +173,15 @@ No screen has the `disclaimer`, the `warnings`, or export and delete. The resear
 
 ### D13. Demo data
 
-"Fill demo" types Acme Robotics (`JobPosting.jsx:15-20`). `GET /demo`, on a server with `DEMO_MODE=1`, holds an N26 job text and two transcripts, and `demo:true` returns the stored N26 name and facts whatever text was sent. Acme plus `demo:true` shows the wrong company. Canned scores only ever apply to those two exact transcripts.
+"Fill demo" types Acme Robotics (`JobPosting.jsx:15-20`). `GET /demo`, on a server with `DEMO_MODE=1`, holds `company_name`, `role_title`, an N26 job text and two transcripts, and `demo:true` returns the stored N26 name and facts whatever text was sent. Acme plus `demo:true` shows the wrong company.
 
-**Recommend** : when `GET /health` says `demo:true`, fill the form from `GET /demo`, send its `job_description` unchanged, and post `transcript` and then `followup_transcript`.
+What happens on a demo job :
+
+- `transcript` or `followup_transcript`, exactly : `/grade` returns the canned score straight away with `fallback:true` and no LLM call, even when the LLM works, and `/next` after it uses the canned question bank straight away. So `followup_transcript` always answers what the session from `/next` asks. This run always shows the sample feedback label from [D11](#d11-report-content).
+- Any other transcript : `/grade` is always live and gets the normal error if that fails. `/next` tries the LLM for up to 30 s, then falls back to the bank.
+- The live grader is not stable enough to carry the canned run : on `transcript` it gave `star`, `evidence` 6 of 8 times, and the other two rounds would have asked different questions. See [api.md](api.md#demo-mode).
+
+**Recommend** : when `GET /health` says `demo:true`, fill company, role and posting from `GET /demo`, so the form unlocks, send its `job_description` unchanged, without the role and company line from [D8](#d8-company-role-and-a-url-as-the-posting), and post `transcript` and then `followup_transcript`.
 
 ### D14. Actions that have to wait
 
@@ -222,10 +231,13 @@ MDN also documents `recognition.processLocally = true` for on-device recognition
 
 ```js
 const API = 'http://localhost:8787'
+const MAX_BODY = 256 * 1024
 
 export async function api(path,{body,method = body ? 'POST' : 'GET',tries = 3} = {}) {
+	const json = body && JSON.stringify(body)
+	if (json && new Blob([json]).size > MAX_BODY) throw Object.assign(new Error('body over 256 KB'),{code:'payload_too_large',retryable:false,status:413})
 	for (let i = 1;;i++) {
-		const res = await fetch(API + path,{method,headers:body ? {'content-type':'application/json'} : {},body:body && JSON.stringify(body),signal:AbortSignal.timeout(180000)})
+		const res = await fetch(API + path,{method,headers:body ? {'content-type':'application/json'} : {},body:json,signal:AbortSignal.timeout(180000)})
 		const data = await res.json()
 		if (res.ok) return data
 		const {code,message,retryable} = data.error
@@ -242,12 +254,13 @@ await api(`/session/${id}`)
 ```
 
 - **`grading_in_progress`** is retryable but must not be repeated : poll `GET /session/:id` every few seconds until `status` is `graded`. While polling, `completed` with `grading_started_at` null means the grade failed and none is running, so call `POST /grade` again or show the error, do not keep waiting. Give up after 5 minutes, the length of the grading lease, and offer a retry. A reload or a second tab that lost the `POST` response polls the same way.
-- **A thrown `TypeError` or `TimeoutError`** means no answer : network down, CORS refused or too slow. It is deliberately not retried. `/research` and `/session` may still be running on the server, and a repeat would create a second job or session.
+- **Check the size before sending, the helper does.** A body far over the 256 KB limit can surface as a `TypeError` instead of `payload_too_large` (Chrome : 1 MB and up always, 700 to 800 KB sometimes).
+- **A thrown `TypeError` or `TimeoutError`** means no answer : network down, CORS refused, too slow or a body far over the limit. It is deliberately not retried. `/research` and `/session` may still be running on the server, and a repeat would create a second job or session.
 - **`message` is for developers.** Show your own text per `code`, the table is in [api.md](api.md#errors).
 
 ## Not checked
 
-- Nothing here was run in a browser. The CORS results come from the server's response headers, the opened-from-disk case included. The helper was run against the real routes in demo mode, with a fake LLM that always fails.
+- Nothing here was run in a browser, except the Chrome body size numbers, which come from an earlier review and were not measured again. The CORS results come from the server's response headers, the opened-from-disk case included. The helper was run against the real routes in demo mode, with a fake LLM that always fails and with the real relay.
 - The Web Speech facts come from MDN and the Chromium source, not from a test.
 - The relay check covered routes only, on one day, with no audio sent. Its audio routes may work once its credentials recover, but the [README](../README.md#before-real-users) already says to replace the relay before real users.
 - The research PDF is not in the repo, so its lines are quoted by section.

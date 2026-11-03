@@ -2,7 +2,7 @@ import {createClient} from '@supabase/supabase-js'
 import type {Fact,Job,Plan,Score,Session,Status} from '../contracts'
 import type {Env} from '../env'
 import {ApiErr} from '../errors'
-import type {SessionPatch,Store} from './types'
+import {type SessionPatch,type Store,stampAfter} from './types'
 
 const UNIQUE = '23505'
 const BAD_TEXT = ['22P05','22P02','PGRST102'] // nul char, lone surrogate in an array insert, lone surrogate
@@ -121,8 +121,9 @@ export function supabaseStore(env:Env,timeoutMs = STORE_MS):Store {
 
 		updateSession:update,
 
-		async saveTranscript(id,from,turns,toStatus) {
-			return update(id,from,{transcript:turns,status:toStatus})
+		async saveTranscript(id,from,turns,toStatus,seen) {
+			const rows = must(await db.from('sessions').update({transcript:turns,status:toStatus,updated_at:stampAfter(seen)}).eq('id',id).in('status',from).eq('updated_at',seen).select())
+			return rows[0] ? toSession(rows[0]) : null
 		},
 
 		async claimGrading(id,leaseMs,now) {

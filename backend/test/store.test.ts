@@ -275,7 +275,7 @@ describe.each(suites)('store contract : %s',(name,make) => {
 
 		it('stores turns verbatim and moves status',async () => {
 			const {sess} = await seed()
-			const got = await store.saveTranscript(sess.id,['created','in_progress'],turns,'in_progress')
+			const got = await store.saveTranscript(sess.id,['created','in_progress'],turns,'in_progress',sess.updated_at)
 			expect(got).toMatchObject({status:'in_progress',transcript:turns})
 			expect(JSON.stringify(got!.transcript)).toBe(JSON.stringify(turns))
 			expect(await store.getSession(sess.id)).toEqual(got)
@@ -283,16 +283,53 @@ describe.each(suites)('store contract : %s',(name,make) => {
 
 		it('replaces, never appends',async () => {
 			const {sess} = await seed()
-			await store.saveTranscript(sess.id,['created'],turns,'in_progress')
-			const got = await store.saveTranscript(sess.id,['in_progress'],turns.slice(0,1),'completed')
+			const one = await store.saveTranscript(sess.id,['created'],turns,'in_progress',sess.updated_at)
+			const got = await store.saveTranscript(sess.id,['in_progress'],turns.slice(0,1),'completed',one!.updated_at)
 			expect(got).toMatchObject({status:'completed',transcript:turns.slice(0,1)})
 		})
 
 		it('refuses a wrong status and keeps the old transcript',async () => {
 			const {sess} = await seed()
-			await store.saveTranscript(sess.id,['created'],turns,'completed')
-			expect(await store.saveTranscript(sess.id,['created','in_progress'],[],'in_progress')).toBeNull()
+			const one = await store.saveTranscript(sess.id,['created'],turns,'completed',sess.updated_at)
+			expect(await store.saveTranscript(sess.id,['created','in_progress'],[],'in_progress',one!.updated_at)).toBeNull()
 			expect((await store.getSession(sess.id))!.transcript).toEqual(turns)
+		})
+
+		it('only writes over the version that was read',async () => {
+			const {sess} = await seed()
+			const one = await store.saveTranscript(sess.id,['created'],turns,'in_progress',sess.updated_at)
+			expect(one).toMatchObject({transcript:turns})
+			expect(await store.saveTranscript(sess.id,['in_progress'],turns.slice(0,1),'in_progress',sess.updated_at)).toBeNull()
+			expect(await store.getSession(sess.id)).toEqual(one)
+		})
+
+		it('every write makes a new version, even in the same millisecond',async () => {
+			const {sess} = await seed()
+			let seen = sess.updated_at
+			for (let i = 0; i < 20; i++) {
+				const up = await store.saveTranscript(sess.id,['created','in_progress'],turns,'in_progress',seen)
+				expect(Date.parse(up!.updated_at)).toBeGreaterThan(Date.parse(seen))
+				seen = up!.updated_at
+			}
+		})
+
+		it('a version from the future still moves on',async () => {
+			const later = ago(-3600000)
+			const {sess} = await seed(1,{updated_at:later})
+			const up = await store.saveTranscript(sess.id,['created'],turns,'in_progress',later)
+			expect(Date.parse(up!.updated_at)).toBeGreaterThan(Date.parse(later))
+		})
+
+		it('of two writers on one version exactly one lands',async () => {
+			const {sess} = await seed()
+			const out = await Promise.all([turns,turns.slice(0,1)].map((t) => store.saveTranscript(sess.id,['created','in_progress'],t,'in_progress',sess.updated_at)))
+			const won = out.filter((s) => s !== null)
+			expect(won).toHaveLength(1)
+			expect(await store.getSession(sess.id)).toEqual(won[0])
+		})
+
+		it('a miss on an unknown session is null',async () => {
+			expect(await store.saveTranscript(uuid(),['created'],turns,'in_progress',iso())).toBeNull()
 		})
 	})
 
@@ -555,7 +592,7 @@ describe.runIf(url && key)('postgres constraints',() => {
 		const s = (await store.createSession(sess(j,'created')))!
 		for (const text of ['a\u0000b','a\ud83db']) {
 			await expect(store.createJob(job({description:text}))).rejects.toMatchObject({code:'bad_request'})
-			await expect(store.saveTranscript(s.id,['created'],[{role:'candidate',text}],'in_progress')).rejects.toMatchObject({code:'bad_request'})
+			await expect(store.saveTranscript(s.id,['created'],[{role:'candidate',text}],'in_progress',s.updated_at)).rejects.toMatchObject({code:'bad_request'})
 		}
 		await store.deleteUser(j.user_id)
 	})

@@ -4,7 +4,7 @@ import {DIMS,Plan,PublicSession,type Dim,type Job,type Question,type Score,type 
 import type {Demo} from '../src/deps'
 import {ApiErr} from '../src/errors'
 import type {Store} from '../src/store/types'
-import {fakeLlm,makeApp} from './helpers'
+import {AS_COMPANY,fakeLlm,makeApp,NEUTRAL} from './helpers'
 
 const ANCHOR = 'Tell me about a time you resolved a conflict on your team.'
 const TS = '2026-01-01T00:00:00.000Z'
@@ -409,6 +409,33 @@ describe('POST /next',() => {
 		const res = await post(app,src.id)
 		expect(res.status).toBe(504)
 		expect(((await res.json()) as any).error.code).toBe('llm_timeout')
+	})
+
+	it.each(AS_COMPANY)('refuses a question that speaks as the company %j',async (q) => {
+		for (const out of [{weak:[q,'w2','w3'],new:'n1'},{weak:['w1','w2','w3'],new:q}]) {
+			const {app,store} = makeApp({llm:fakeLlm({next:() => out})})
+			const {job,src} = await seed(store)
+			const res = await post(app,src.id)
+			expect(res.status).toBe(502)
+			expect(((await res.json()) as any).error.code).toBe('llm_bad_output')
+			expect((await allSessions(store,job)).length).toBe(1)
+		}
+	})
+
+	it.each(NEUTRAL)('keeps %j',async (q) => {
+		const {app,store} = makeApp({llm:fakeLlm({next:() => ({weak:[q,'w2','w3'],new:'n1'})})})
+		const {src} = await seed(store)
+		const res = await post(app,src.id)
+		expect(res.status).toBe(200)
+		expect(((await res.json()) as any).session.questions[0].text).toBe(q)
+	})
+
+	it('the prompt forbids speaking as the company, also where the job description says we',async () => {
+		const llm = fakeLlm({next:() => ({weak:['w1','w2','w3'],new:'n1'})})
+		const {app,store} = makeApp({llm})
+		const {src} = await seed(store)
+		await post(app,src.id)
+		expect(llm.calls[0].system).toMatch(/never speak as the company.*we, us, our.*job description/i)
 	})
 
 	it('rejects llm output with the wrong shape and creates nothing',async () => {

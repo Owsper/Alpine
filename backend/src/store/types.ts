@@ -3,6 +3,9 @@ import type {Fact,Job,Plan,Score,Session,Status,Turn} from '../contracts'
 export type SessionPatch = Partial<Omit<Session,'id'>>
 export type UserExport = {jobs:Job[],facts:(Fact & {job_id:string})[],sessions:Session[],scores:Score[],plans:Plan[]}
 
+// updated_at is the version a transcript write checks, so a write has to change it even in the same ms or with a clock behind
+export const stampAfter = (seen:string) => new Date(Math.max(Date.now(),Date.parse(seen) + 1)).toISOString()
+
 export interface Store {
 	kind:'memory'|'supabase'
 	ping():Promise<void>
@@ -16,7 +19,8 @@ export interface Store {
 	listSessions(jobId:string):Promise<Session[]>
 	lastSessionNumber(jobId:string):Promise<number>
 	updateSession(id:string,from:Status[],patch:SessionPatch):Promise<Session|null>
-	saveTranscript(id:string,from:Status[],turns:Turn[],toStatus:Status):Promise<Session|null>
+	// null when the status is wrong or updated_at is no longer the seen one
+	saveTranscript(id:string,from:Status[],turns:Turn[],toStatus:Status,seen:string):Promise<Session|null>
 	claimGrading(id:string,leaseMs:number,now:Date):Promise<boolean>
 	releaseGrading(id:string,claim?:string):Promise<void>
 	saveScore(score:Score):Promise<Score>
