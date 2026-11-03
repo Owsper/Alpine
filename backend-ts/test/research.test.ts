@@ -2,7 +2,8 @@ import {Hono} from 'hono'
 import {describe,expect,it,vi} from 'vitest'
 import type {Demo} from '../src/deps'
 import {ApiErr,errRes,toApiErr} from '../src/errors'
-import {pageText,researchRoutes} from '../src/research'
+import {parseHtml} from '../src/fetch'
+import {researchRoutes} from '../src/research'
 import {memStore} from '../src/store/mem'
 import {fakeLlm,makeApp,testEnv} from './helpers'
 
@@ -23,6 +24,8 @@ const fact = (o = {}) => ({source_url:HOME_URL,quote:Q_HOME,...o})
 
 type Page = {html:string,url?:string,retrieved_at?:string}
 
+const pageText = async (html:string) => (await parseHtml(html))?.text ?? ''
+
 function build(o:{pages?:Record<string,Page|string|Error>,company?:() => unknown,facts?:() => unknown,demo?:Demo,start?:Date} = {}) {
 	const pages = o.pages ?? {[HOME_URL]:HOME,[ABOUT_URL]:ABOUT}
 	const fetchPage = vi.fn(async (url:string,key:string) => {
@@ -30,7 +33,7 @@ function build(o:{pages?:Record<string,Page|string|Error>,company?:() => unknown
 		if (!p) throw new Error('404')
 		if (p instanceof Error) throw p
 		const page = typeof p === 'string' ? {html:p} : p
-		return {url:page.url ?? url,html:page.html,retrieved_at:page.retrieved_at ?? AT}
+		return {url:page.url ?? url,text:await pageText(page.html),retrieved_at:page.retrieved_at ?? AT}
 	})
 	const store = memStore()
 	const llm = fakeLlm({
@@ -320,6 +323,21 @@ describe('claims that do not stand alone',() => {
 		await post(app,ask())
 		expect(llm.calls[1].system).toMatch(/customer quotes.*legal or provider notices/)
 	})
+
+	it('the prompt names what code throws away, so the model picks other sentences',async () => {
+		const first = build()
+		await post(first.app,ask())
+		const {system} = first.llm.calls[1]
+		expect(system).toContain('over 300 characters')
+		expect(system).toContain("part of the company's name")
+		const named = system.match(/before it, in any case : (.*?)\. We and Our/)![1].split(', ')
+		expect(named.length).toBeGreaterThan(40)
+		expect(named).toContain('plus')
+		expect(system).toContain("French Plus de and Plus d' are fine")
+		const quotes = named.map((w) => w + ' Acme builds warehouse robots.')
+		const {app} = build({pages:{[HOME_URL]:'<body><p>' + quotes.join('</p><p>') + '</p></body>'},facts:() => ({facts:quotes.map((quote) => fact({quote}))})})
+		expect((await (await post(app,ask())).json()).facts).toEqual([])
+	})
 })
 
 describe('a site that refuses us',() => {
@@ -343,10 +361,18 @@ describe('a site that refuses us',() => {
 		expect(names(llm)).toEqual(['research_company'])
 	})
 
-	it.each(['404','status_500','status_503','timeout','robots_unknown','unparseable','not_html','encoded'])('%s is no refusal',async (why) => {
+	it.each(['status_404','status_500','status_503','timeout','robots_unknown','unparseable','not_html','encoded'])('%s is no refusal',async (why) => {
 		const {app} = build({...guessed,pages:{[HOME_URL]:new Error(why)}})
 		const b = await (await post(app,{user_id:USER,job_description:JD})).json()
 		expect(b.warnings).toEqual(['no_official_source'])
+	})
+
+	it('a company_url on a host that does not match the name counts, the caller chose that site',async () => {
+		const pages = Object.fromEntries(['/','/about','/about-us','/company','/mission','/values','/careers'].map((p) => ['https://partner.test' + p,robots]))
+		const {app} = build({pages})
+		const b = await (await post(app,ask({company_url:'https://partner.test/'}))).json()
+		expect(b.warnings).toEqual(['no_sourced_facts','source_refused'])
+		expect(b.company.url).toBe('https://partner.test/')
 	})
 
 	it('a host that may not be the company says nothing about the company',async () => {

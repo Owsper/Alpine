@@ -32,10 +32,10 @@ create table sessions (
 	flow jsonb not null,
 	interviewer_instructions text not null,
 	transcript jsonb,
-	grading_started_at timestamptz,
+	grading_started_at timestamptz(3),
 	source_session_id uuid references sessions(id) on delete set null,
 	created_at timestamptz not null default now(),
-	updated_at timestamptz not null default now(),
+	updated_at timestamptz(3) not null default now(),
 	constraint sessions_job_number_key unique(job_id,number)
 );
 create index sessions_user_idx on sessions(user_id);

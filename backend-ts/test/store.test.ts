@@ -1,4 +1,5 @@
 import {randomUUID as uuid} from 'node:crypto'
+import {readFileSync} from 'node:fs'
 import {afterAll,describe,expect,it} from 'vitest'
 import {DIMS,Job,Plan,Question,Score,Session,type Fact,type Turn} from '../src/contracts'
 import {memStore} from '../src/store/mem'
@@ -595,5 +596,28 @@ describe.runIf(url && key)('postgres constraints',() => {
 			await expect(store.saveTranscript(s.id,['created'],[{role:'candidate',text}],'in_progress',s.updated_at)).rejects.toMatchObject({code:'bad_request'})
 		}
 		await store.deleteUser(j.user_id)
+	})
+
+	// the store reads ms, so a stored microsecond would never equal what was read
+	it.each(['05.123456','05.999999'])('a row written at second %s can still save a transcript',async (sec) => {
+		const j = await store.createJob(job())
+		const s = (await store.createSession({...sess(j,'created'),updated_at:`2026-01-02T03:04:${sec}Z`}))!
+		expect(await store.saveTranscript(s.id,['created'],[{role:'candidate',text:'hi'}],'in_progress',s.updated_at)).not.toBeNull()
+		await store.deleteUser(j.user_id)
+	})
+
+	it('a lease written with microseconds can be released with the value read back',async () => {
+		const j = await store.createJob(job())
+		const s = (await store.createSession({...sess(j,'completed'),grading_started_at:'2026-01-02T03:04:05.123456Z'}))!
+		await store.releaseGrading(s.id,s.grading_started_at!)
+		expect((await store.getSession(s.id))!.grading_started_at).toBeNull()
+		await store.deleteUser(j.user_id)
+	})
+})
+
+describe('migration',() => {
+	it('timestamps the store compares with eq hold the ms it reads back',() => {
+		const sql = readFileSync(new URL('../supabase/migrations/0001_init.sql',import.meta.url),'utf8')
+		for (const col of ['updated_at','grading_started_at']) expect(sql).toContain(col + ' timestamptz(3)')
 	})
 })
