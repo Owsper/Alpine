@@ -23,11 +23,12 @@ const fact = (o = {}) => ({source_url:HOME_URL,quote:Q_HOME,...o})
 
 type Page = {html:string,url?:string,retrieved_at?:string}
 
-function build(o:{pages?:Record<string,Page|string>,company?:() => unknown,facts?:() => unknown,demo?:Demo,start?:Date} = {}) {
+function build(o:{pages?:Record<string,Page|string|Error>,company?:() => unknown,facts?:() => unknown,demo?:Demo,start?:Date} = {}) {
 	const pages = o.pages ?? {[HOME_URL]:HOME,[ABOUT_URL]:ABOUT}
 	const fetchPage = vi.fn(async (url:string,key:string) => {
 		const p = pages[url]
 		if (!p) throw new Error('404')
+		if (p instanceof Error) throw p
 		const page = typeof p === 'string' ? {html:p} : p
 		return {url:page.url ?? url,html:page.html,retrieved_at:page.retrieved_at ?? AT}
 	})
@@ -218,6 +219,178 @@ describe('fact verification',() => {
 		const again = await (await post(app,ask())).json()
 		expect(again.cached).toBe(false)
 		expect(names(llm).filter((n) => n === 'research_facts')).toHaveLength(2)
+	})
+})
+
+describe('claims that do not stand alone',() => {
+	const said = (q:string) => '<html><body><p>Acme builds warehouse robots.</p><p>' + q + '</p></body></html>'
+	const claimsOf = async (q:string) => {
+		const {app} = build({pages:{[HOME_URL]:said(q)},facts:() => ({facts:[fact({quote:q})]})})
+		return (await (await post(app,ask())).json()).facts.map((f:{claim:string}) => f.claim)
+	}
+
+	it.each([
+		'So we started building robots for retailers.',
+		'And it ships to twelve countries now.',
+		'But the company also runs a repair service.',
+		'Or you can lease the robots by the month.',
+		'Then the team moved to a bigger office.',
+		'Turns out retailers want smaller robots.',
+		'This is why customers keep coming back.',
+		'That makes the robots cheaper to run.',
+		'These robots work in every warehouse.',
+		'Those numbers have grown every single year.',
+		'It runs on three continents today.',
+		"It's the largest robot maker in Graz.",
+		'They have built more than 900 robots.',
+		'SO WE STARTED BUILDING ROBOTS FOR RETAILERS.',
+		'and it ships to twelve countries now.',
+		'"And it ships to twelve countries now."',
+		'However the company stayed in Graz for years.',
+		'Also the company runs a repair service.',
+		'Its robots work in every warehouse here.',
+		'Their robots work in every warehouse here.',
+		'As a result the company doubled in size.',
+		'For example the robots lift 400 kilos each.',
+	])('drops %s',async (q) => {
+		expect(await claimsOf(q)).toEqual([])
+	})
+
+	it.each([
+		'We build warehouse robots for retailers.',
+		'Our robots work in every warehouse in Europe.',
+		'Acme builds warehouse robots for retailers.',
+		'Italy is the largest market for the robots.',
+		'Thesis Robotics joined the group last year.',
+		'Sony and Acme build robots together now.',
+		'Oracle runs the warehouse software for Acme.',
+		'Android tablets control every one of the robots.',
+		'So-called dark stores are the main customers.',
+		'IT services are the second business of Acme.',
+	])('keeps %s',async (q) => {
+		expect(await claimsOf(q)).toEqual([q])
+	})
+
+	const claimsFor = async (name:string|null,q:string) => {
+		const {app} = build({company:() => company({company_name:name}),pages:{[HOME_URL]:said(q)},facts:() => ({facts:[fact({quote:q})]})})
+		return (await (await post(app,ask())).json()).facts.map((f:{claim:string}) => f.claim)
+	}
+
+	it.each([
+		['Which?',"Which? is the UK's consumer champion."],
+		['Which? Ltd',"Which? is the UK's consumer champion."],
+		['Meanwhile','Meanwhile is designed to operate for generations.'],
+		['Finally','Finally (Backoffice.co, Inc.) is no longer operating.'],
+		['Finally',"Finally's bookkeeping business has been acquired by Inkle."],
+		['Finally','Finally\u2019s bookkeeping business has been acquired by Inkle.'],
+		['Instead','Instead learns your entities and files your taxes.'],
+		['So Energy','So Energy has been recognised as a great place to work.'],
+		['So Energy GmbH','So Energy has been recognised as a great place to work.'],
+		['ALSO','ALSO is one of the leading technology providers.'],
+		['ITS Group','ITS Group delivers rail signalling across Europe.'],
+		['AND Digital','AND Digital builds software for its clients.'],
+		['Hence Technologies, Inc.','Hence Technologies builds legal software for firms.'],
+		['Which?','"Which? is the UK\'s consumer champion."'],
+	])('keeps a claim opened by the company name %s : %s',async (name,q) => {
+		expect(await claimsFor(name,q)).toEqual([q])
+	})
+
+	it.each([
+		['So Energy','So we started selling energy to homes.'],
+		['Which?','Which makes the robots cheaper to run.'],
+		['Also Energy','Also the company runs a repair service.'],
+		['It','Its robots work in every warehouse here.'],
+		['Its Group','Its robots work in every warehouse here.'],
+		['Acme Robotics','Plus the company runs a repair service.'],
+		[null,"Which? is the UK's consumer champion."],
+	])('still drops a claim that only looks like the company %s : %s',async (name,q) => {
+		expect(await claimsFor(name,q)).toEqual([])
+	})
+
+	it.each([
+		'Plus de 80 millions de patients utilisent Doctolib.',
+		"Plus d'un million de patients utilisent Doctolib.",
+		'Plus d\u2019un million de patients utilisent Doctolib.',
+	])('keeps the French %s',async (q) => {
+		expect(await claimsFor('Doctolib',q)).toEqual([q])
+	})
+
+	it('the prompt skips customer quotes and legal or provider notices',async () => {
+		const {app,llm} = build()
+		await post(app,ask())
+		expect(llm.calls[1].system).toMatch(/customer quotes.*legal or provider notices/)
+	})
+})
+
+describe('a site that refuses us',() => {
+	const robots = new Error('robots')
+	const guessed = {company:() => company({guess_url:HOME_URL})}
+
+	it.each([
+		['robots.txt','robots'],
+		['403','status_403'],
+		['429','status_429'],
+		['an ai opt-out','tdm_reserved'],
+	])('%s says source_refused and company.url stays null',async (name,why) => {
+		const {app,llm} = build({...guessed,pages:{[HOME_URL]:new Error(why)}})
+		const res = await post(app,{user_id:USER,job_description:JD})
+		expect(res.status).toBe(200)
+		const b = await res.json()
+		expect(b.warnings).toEqual(['no_official_source','source_refused'])
+		expect(b.facts).toEqual([])
+		expect(b.company).toEqual({name:'Acme Robotics',url:null})
+		expect(b.job.company_url).toBeNull()
+		expect(names(llm)).toEqual(['research_company'])
+	})
+
+	it.each(['404','status_500','status_503','timeout','robots_unknown','unparseable','not_html','encoded'])('%s is no refusal',async (why) => {
+		const {app} = build({...guessed,pages:{[HOME_URL]:new Error(why)}})
+		const b = await (await post(app,{user_id:USER,job_description:JD})).json()
+		expect(b.warnings).toEqual(['no_official_source'])
+	})
+
+	it('a host that may not be the company says nothing about the company',async () => {
+		const {app} = build({company:() => company({guess_url:'https://partner.test/'}),pages:{'https://partner.test/':new Error('status_403')}})
+		const b = await (await post(app,{user_id:USER,job_description:JD})).json()
+		expect(b.warnings).toEqual(['no_official_source'])
+	})
+
+	it('another site of the company that can be read wins',async () => {
+		const corp = 'https://corporate.acme.test/'
+		const {app} = build({
+			company:() => company({guess_url:HOME_URL,other_urls:[corp]}),
+			pages:{[HOME_URL]:robots,[corp]:'<html><body><p>Acme Robotics</p><p>' + Q_HOME + '</p></body></html>'},
+			facts:() => ({facts:[fact({source_url:corp})]}),
+		})
+		const b = await (await post(app,{user_id:USER,job_description:JD})).json()
+		expect(b.warnings).toEqual([])
+		expect(b.company.url).toBe(corp)
+		expect(b.facts).toHaveLength(1)
+	})
+
+	it('the company site still counts as refusing when a page of another host was read',async () => {
+		const {app} = build({
+			company:() => company({guess_url:HOME_URL,other_urls:['https://partner.test/']}),
+			pages:{[HOME_URL]:robots,'https://partner.test/':'<html><body><p>We sell robots</p></body></html>'},
+		})
+		const b = await (await post(app,{user_id:USER,job_description:JD})).json()
+		expect(b.warnings).toEqual(['no_official_source','source_refused'])
+		expect(b.company.url).toBeNull()
+	})
+
+	it('a company_url that refuses keeps its url and no_sourced_facts',async () => {
+		const pages = Object.fromEntries(['/','/about','/about-us','/company','/mission','/values','/careers'].map((p) => ['https://acme.test' + p,robots]))
+		const {app,llm} = build({pages})
+		const b = await (await post(app,ask())).json()
+		expect(b.warnings).toEqual(['no_sourced_facts','source_refused'])
+		expect(b.company.url).toBe(HOME_URL)
+		expect(names(llm)).toEqual(['research_company'])
+	})
+
+	it('one refusing page on a site that could be read is not a refusing site',async () => {
+		const {app} = build({pages:{[HOME_URL]:HOME,[ABOUT_URL]:robots},facts:() => ({facts:[]})})
+		const b = await (await post(app,ask())).json()
+		expect(b.warnings).toEqual(['no_sourced_facts'])
 	})
 })
 

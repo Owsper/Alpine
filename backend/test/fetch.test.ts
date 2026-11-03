@@ -101,6 +101,14 @@ describe('checkUrl',() => {
 		expect(() => checkUrl('https://acme.test.evil.test/','acme.test')).toThrow('off_site')
 	})
 
+	it('the english subdomain is the same site, zalando sends an english reader there',() => {
+		expect(checkUrl('https://en.acme.test/','acme.test').href).toBe('https://en.acme.test/')
+		expect(keyOf(new URL('https://en.acme.co.uk/'))).toBe('acme.co.uk')
+		expect(keyOf(new URL('https://en.com/'))).toBe('en.com')
+		expect(() => checkUrl('https://de.acme.test/','acme.test')).toThrow('off_site')
+		expect(() => checkUrl('https://en.acme.test.evil.test/','acme.test')).toThrow('off_site')
+	})
+
 	it('keyOf strips www, case and the trailing dot',() => {
 		expect(keyOf(new URL('https://WWW.Acme.Test./x'))).toBe('acme.test')
 	})
@@ -192,6 +200,16 @@ describe('safeFetch redirects',() => {
 		expect(asked.filter((u) => !u.endsWith('/robots.txt'))).toEqual(['https://acme.test/'])
 	})
 
+	it('follows a redirect to the english subdomain and keeps its address',async () => {
+		const {io} = fakeIo({'https://www.acme.test/':moved('https://en.acme.test/?_rfl=de'),'https://en.acme.test/?_rfl=de':page()})
+		await expect(safeFetch('https://www.acme.test/',undefined,{io})).resolves.toMatchObject({url:'https://en.acme.test/?_rfl=de'})
+	})
+
+	it('still checks the dns of the english subdomain',async () => {
+		const {io} = fakeIo({'https://acme.test/':moved('https://en.acme.test/')},{'en.acme.test':['127.0.0.1']})
+		await expect(safeFetch('https://acme.test/',undefined,{io})).rejects.toThrow('private')
+	})
+
 	it('refuses a same host redirect once dns turns private',async () => {
 		const {io} = fakeIo({'https://acme.test/':moved('https://www.acme.test/')},{'www.acme.test':['127.0.0.1']})
 		await expect(safeFetch('https://acme.test/',undefined,{io})).rejects.toThrow('private')
@@ -242,6 +260,25 @@ describe('safeFetch robots',() => {
 		const {io,asked} = fakeIo({'https://acme.test/robots.txt':r,'https://acme.test/':page()})
 		await expect(safeFetch('https://acme.test/',undefined,{io})).rejects.toThrow('robots')
 		expect(asked).not.toContain('https://acme.test/')
+	})
+
+	it.each([
+		['403',{status:403,headers:{},body:''}],
+		['429',{status:429,headers:{},body:''}],
+		['disallow all',robots('User-agent: *\nDisallow: /')],
+	] as [string,Raw][])('%s on robots.txt is the site saying no',async (name,r) => {
+		const {io} = fakeIo({'https://acme.test/robots.txt':r,'https://acme.test/':page()})
+		await expect(safeFetch('https://acme.test/',undefined,{io})).rejects.toThrow(/^robots$/)
+	})
+
+	it.each([
+		['500',{status:500,headers:{},body:''}],
+		['503',{status:503,headers:{},body:''}],
+		['network failure',new Error('ECONNRESET')],
+		['off site redirect',moved('https://evil.test/robots.txt')],
+	] as [string,Raw|Error][])('%s on robots.txt is no answer, not a refusal',async (name,r) => {
+		const {io} = fakeIo({'https://acme.test/robots.txt':r,'https://acme.test/':page()})
+		await expect(safeFetch('https://acme.test/',undefined,{io})).rejects.toThrow(/^robots_unknown$/)
 	})
 
 	it('checks robots on every hop of a redirect',async () => {
@@ -328,7 +365,7 @@ describe('real transport',() => {
 		}
 		if (path === '/big') {
 			res.writeHead(200,{'content-type':'text/html'})
-			return res.end('x'.repeat(3 * 1024 * 1024))
+			return res.end('x'.repeat(4 * 1024 * 1024))
 		}
 		if (path === '/gz') {
 			res.writeHead(200,{'content-type':'text/html','content-encoding':'gzip'})
@@ -371,10 +408,16 @@ describe('real transport',() => {
 		expect(seen[0]['accept-encoding']).toBe('identity')
 	})
 
-	it('stops reading at 1MB',async () => {
+	it('asks for english, a site that redirects by ip otherwise picks the language of this server',async () => {
+		seen = []
+		await get('/')
+		expect(seen[0]['accept-language']).toBe('en')
+	})
+
+	it('stops reading at 3MB',async () => {
 		const r = await get('/big')
 		expect(r.status).toBe(200)
-		expect(r.body.length).toBe(1024 * 1024)
+		expect(r.body.length).toBe(3 * 1024 * 1024)
 	})
 
 	it('does not follow redirects by itself',async () => {

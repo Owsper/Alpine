@@ -231,7 +231,7 @@ describe('spec-3 : the improvement loop survives an outage',() => {
 		const by = Object.fromEntries(g2.progress.map((p:{dimension:string}) => [p.dimension,p]))
 		expect(by.star).toMatchObject({prev:2,cur:4,delta:2,significant:true})
 		expect(by.evidence).toMatchObject({prev:2,cur:4,delta:2,significant:true})
-		expect(llm.calls.map((c) => c.name)).toContain('grade')
+		expect(llm.calls).toEqual([])
 
 		const third = await post('/next',{session_id:s2.id})
 		expect(third.status).toBe(200)
@@ -287,30 +287,31 @@ describe('privacy-demo-1, reliability-3, spec-7 : a hung llm does not stall the 
 		return new Promise(() => {})
 	}
 
-	it('/grade gives up at 45 s and /next at 30 s, and the calls are aborted',async () => {
-		vi.useFakeTimers({toFake:['setTimeout','clearTimeout']})
+	it('the canned transcript does not wait for the llm at all',async () => {
 		const seen:AbortSignal[] = []
 		const {app} = makeApp({llm:fakeLlm({grade:never(seen),next:never(seen)}),demo})
 		const post = poster(app)
 		const job = await demoJob(post)
 		const s = await (await post('/session',{user_id:USER,job_id:job.id})).json()
 		await post(`/session/${s.id}/transcript`,{turns:demo.transcript(),final:true})
+		const g = await post('/grade',{session_id:s.id})
+		expect((await g.json()).fallback).toBe(true)
+		expect((await post('/next',{session_id:s.id})).status).toBe(200)
+		expect(seen).toEqual([])
+	})
+
+	it('/next on a live transcript of a demo job gives up at 30 s and the call is aborted',async () => {
+		vi.useFakeTimers({toFake:['setTimeout','clearTimeout']})
+		const seen:AbortSignal[] = []
+		const {app,store} = makeApp({llm:fakeLlm({next:never(seen)}),demo})
+		const post = poster(app)
+		const job = await demoJob(post)
+		const s = await (await post('/session',{user_id:USER,job_id:job.id})).json()
+		await post(`/session/${s.id}/transcript`,{turns:[{role:'candidate',text:'A live answer'}],final:true})
+		await store.saveScore(demo.gradeFallback(s.id,new Date(NOW)))
+		await store.updateSession(s.id,['completed'],{status:'graded'})
 
 		let done = false
-		const g = post('/grade',{session_id:s.id}).then((r) => {
-			done = true
-			return r
-		})
-		await vi.advanceTimersByTimeAsync(44000)
-		expect(done).toBe(false)
-		await vi.advanceTimersByTimeAsync(1000)
-		const gr = await g
-		expect(gr.status).toBe(200)
-		expect((await gr.json()).fallback).toBe(true)
-		expect(seen).toHaveLength(3)
-		expect(seen.every((x) => x.aborted)).toBe(true)
-
-		done = false
 		const n = post('/next',{session_id:s.id}).then((r) => {
 			done = true
 			return r
@@ -319,21 +320,28 @@ describe('privacy-demo-1, reliability-3, spec-7 : a hung llm does not stall the 
 		expect(done).toBe(false)
 		await vi.advanceTimersByTimeAsync(1000)
 		expect((await n).status).toBe(200)
-		expect(seen[3].aborted).toBe(true)
+		expect(seen[0].aborted).toBe(true)
 	})
 
-	it('a healthy but slow grade inside the deadline stays a real grade',async () => {
+	it('a live transcript of a demo job is never cut short and never gets a canned score',async () => {
 		vi.useFakeTimers({toFake:['setTimeout','clearTimeout']})
-		const fb = demo.gradeFallback(USER,new Date(NOW))
-		const slow = () => new Promise((ok) => setTimeout(() => ok({scores:fb.scores.map(({dimension,score,evidence_quote,tip}) => ({dimension,score,evidence_quote,tip}))}),30000))
-		const {app} = makeApp({llm:fakeLlm({grade:slow}),demo})
+		const seen:AbortSignal[] = []
+		const {app} = makeApp({llm:fakeLlm({grade:never(seen)}),demo})
 		const post = poster(app)
 		const job = await demoJob(post)
 		const s = await (await post('/session',{user_id:USER,job_id:job.id})).json()
-		await post(`/session/${s.id}/transcript`,{turns:demo.transcript(),final:true})
-		const g = post('/grade',{session_id:s.id})
-		await vi.advanceTimersByTimeAsync(30000)
-		expect((await (await g).json()).fallback).toBe(false)
+		await post(`/session/${s.id}/transcript`,{turns:[{role:'candidate',text:'A live answer'}],final:true})
+
+		let done = false
+		const g = post('/grade',{session_id:s.id}).then((r) => {
+			done = true
+			return r
+		})
+		await vi.advanceTimersByTimeAsync(60000)
+		expect(done).toBe(false)
+		await vi.advanceTimersByTimeAsync(210000)
+		expect((await (await g).json()).error.code).toBe('llm_timeout')
+		expect(seen.every((x) => x.aborted)).toBe(true)
 	})
 
 	it('later demo sessions fall back to the prebuilt questions with fresh ids and the same anchor',async () => {
@@ -1220,6 +1228,20 @@ describe('supabase store against a stub gateway',() => {
 		const plans:Record<string,unknown>[] = []
 		return {jobs,sessions,company_facts,scores,plans}
 	}
+
+	it('a transcript save only writes over the version it read, and moves the version on',async () => {
+		const seen:{method:string,url:URL,body:string}[] = []
+		const gw = await httpStub((req,res) => {
+			seen.push(req)
+			res.writeHead(200,json)
+			res.end('[]')
+		})
+		expect(await supabaseStore(envOf(gw.url)).saveTranscript(randomUUID(),['created'],[],'in_progress',AT)).toBeNull()
+		expect(seen[0].method).toBe('PATCH')
+		expect(seen[0].url.searchParams.get('updated_at')).toBe('eq.' + AT)
+		expect(Date.parse(JSON.parse(seen[0].body).updated_at)).toBeGreaterThan(Date.parse(AT))
+		gw.close()
+	})
 
 	it('reliability-11 : export is complete past the row cap and the url limit',async () => {
 		const data = big()

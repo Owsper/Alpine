@@ -6,7 +6,7 @@ import {ApiErr} from '../src/errors'
 import type {LlmCall} from '../src/llm'
 import {memStore} from '../src/store/mem'
 import type {Store} from '../src/store/types'
-import {fakeLlm,makeApp} from './helpers'
+import {AS_COMPANY,fakeLlm,makeApp,NEUTRAL} from './helpers'
 
 const JD = 'Backend engineer at Acme. Build and run APIs.'
 const USER = randomUUID()
@@ -232,6 +232,47 @@ describe('POST /session',() => {
 	})
 })
 
+describe('questions do not speak as the company',() => {
+	const five = (first:string) => ({questions:[first,'q1 about apis','q2 about tests','q3 about queues','q4 about sql'].map((text,i) => ({text,is_anchor:i === 4}))})
+	const four = (first:string) => ({questions:[first,'l1 about apis','l2 about tests','l3 about queues'].map((text) => ({text}))})
+
+	it.each(AS_COMPANY)('the first session refuses %j',async (q) => {
+		const {app,store} = makeApp({llm:fakeLlm({session:() => five(q)})})
+		await errOf(await post(app,'/session',{user_id:USER,job_description:JD}),502,'llm_bad_output')
+		expect((await store.exportUser(USER)).sessions).toEqual([])
+	})
+
+	it.each(AS_COMPANY)('a later session refuses %j',async (q) => {
+		const {app,s,store} = await setup({llm:fakeLlm({session:(c) => 'excluded_questions' in JSON.parse(c.user) ? four(q) : qs(2)})})
+		await errOf(await post(app,'/session',{user_id:USER,job_id:s.job_id}),502,'llm_bad_output')
+		expect(await store.lastSessionNumber(s.job_id)).toBe(1)
+	})
+
+	it.each(NEUTRAL)('the first session keeps %j',async (q) => {
+		const {s} = await setup({llm:fakeLlm({session:() => five(q)})})
+		expect(s.questions[0].text).toBe(q)
+	})
+
+	it.each(NEUTRAL)('a later session keeps %j',async (q) => {
+		const {app,s} = await setup({llm:fakeLlm({session:(c) => 'excluded_questions' in JSON.parse(c.user) ? four(q) : qs(2)})})
+		const res = await post(app,'/session',{user_id:USER,job_id:s.job_id})
+		expect(res.status).toBe(200)
+		expect((await res.json()).questions[0].text).toBe(q)
+	})
+
+	it('both prompts forbid it, also where the job description says we',async () => {
+		const {app,s,llm} = await setup()
+		await post(app,'/session',{user_id:USER,job_id:s.job_id})
+		expect(llm.calls).toHaveLength(2)
+		for (const c of llm.calls) expect(c.system).toMatch(/never speak as the company.*we, us, our.*job description/i)
+	})
+
+	it('the voice interviewer is told the same',async () => {
+		const {s} = await setup()
+		expect(s.interviewer_instructions).toMatch(/never say we, us or our for it, even where a fact does/i)
+	})
+})
+
 describe('flow and instructions',() => {
 	it('says in the intro that this is an AI, practice only, unaffiliated, and what is saved',async () => {
 		const {s} = await setup()
@@ -439,6 +480,188 @@ describe('POST /session/:id/transcript',() => {
 		expect(await store.getSession(s.id)).toEqual(before)
 	})
 
+	// holds the write of a save with this many turns until the test lets it go
+	function holdWrite(store:Store,size:number) {
+		const write = store.saveTranscript
+		let reached = () => {}
+		let go = () => {}
+		const atWrite = new Promise<void>((ok) => reached = ok)
+		const gate = new Promise<void>((ok) => go = ok)
+		store.saveTranscript = async (...a) => {
+			if (a[2].length === size) {
+				reached()
+				await gate
+			}
+			return write(...a)
+		}
+		return {atWrite,go:() => go()}
+	}
+
+	it('a shorter save that overlaps a longer one can not shrink the transcript',async () => {
+		const {app,s,store} = await setup()
+		const {atWrite,go} = holdWrite(store,1)
+		const short = save(app,s.id,turns.slice(0,1))
+		await atWrite
+		expect((await save(app,s.id,turns)).status).toBe(200)
+		go()
+		const e = await errOf(await short,409,'invalid_state')
+		expect(e.details).toEqual({stored_turns:turns.length})
+		expect((await store.getSession(s.id))?.transcript).toEqual(turns)
+	})
+
+	it('a save that lost the race but is still long enough looks again and lands',async () => {
+		const {app,s,store} = await setup()
+		const next = turns.map((t):Turn => ({...t,text:t.text + ' edited'}))
+		const {atWrite,go} = holdWrite(store,turns.length)
+		const first = save(app,s.id,next)
+		await atWrite
+		expect((await post(app,`/session/${s.id}/start`,{})).status).toBe(200)
+		go()
+		expect((await first).status).toBe(200)
+		expect((await store.getSession(s.id))?.transcript).toEqual(next)
+	})
+
+	it('a save that lost to a final one gets the frozen answer',async () => {
+		const {app,s,store} = await setup()
+		const {atWrite,go} = holdWrite(store,1)
+		const short = save(app,s.id,[turns[0]])
+		await atWrite
+		await save(app,s.id,turns,true)
+		go()
+		await errOf(await short,409,'invalid_state')
+		expect(await store.getSession(s.id)).toMatchObject({status:'completed',transcript:turns})
+	})
+
+	it('many saves at once never leave less than the longest that was accepted',async () => {
+		const {app,s,store} = await setup()
+		const lists = Array.from({length:40},(x,i) => Array.from({length:(i * 7 % 40) + 1},(y,j):Turn => ({role:'candidate',text:'turn ' + j})))
+		const out = await Promise.all(lists.map((l) => save(app,s.id,l)))
+		const ok = lists.filter((x,i) => out[i].status === 200).map((l) => l.length)
+		expect(ok.length).toBeGreaterThan(0)
+		expect((await store.getSession(s.id))?.transcript?.length).toBe(Math.max(...ok))
+		for (const r of out) expect([200,409]).toContain(r.status)
+	})
+
+	describe('a save that would lose a stored answer',() => {
+		const restarted:Turn[] = [turns[0],{role:'candidate',text:'lol'}]
+		const long:Turn[] = [...turns,{role:'interviewer',text:'And then?'},{role:'candidate',text:'It held up for a year.'}]
+
+		it.each([false,true])('a list restarted from empty is refused with final %s and changes nothing',async (final) => {
+			const {app,s,store} = await setup()
+			await save(app,s.id,turns)
+			const before = await store.getSession(s.id)
+			const e = await errOf(await save(app,s.id,restarted,final),409,'invalid_state')
+			expect(e.details).toEqual({stored_turns:2,changed_turn:1})
+			expect(await store.getSession(s.id)).toEqual(before)
+		})
+
+		it.each([
+			['a blank answer',[turns[0],{role:'candidate',text:''}]],
+			['a shorter answer',[turns[0],{role:'candidate',text:'We moved'}]],
+			['an answer given to the interviewer',[turns[0],{role:'interviewer',text:turns[1].text}]],
+			['a longer list that drops it',[turns[0],{role:'candidate',text:'lol'},{role:'candidate',text:turns[1].text}]],
+		] as [string,Turn[]][])('%s is refused',async (name,t) => {
+			const {app,s,store} = await setup()
+			await save(app,s.id,turns)
+			await errOf(await save(app,s.id,t),409,'invalid_state')
+			expect((await store.getSession(s.id))?.transcript).toEqual(turns)
+		})
+
+		it('names the first answer that would change, deep in the list',async () => {
+			const {app,s} = await setup()
+			await save(app,s.id,long)
+			const e = await errOf(await save(app,s.id,[...long.slice(0,3),{role:'candidate',text:'lol'}]),409,'invalid_state')
+			expect(e.details).toEqual({stored_turns:4,changed_turn:3})
+		})
+
+		it.each([false,true])('replace:true says it is a correction, final %s',async (final) => {
+			const {app,s,store} = await setup()
+			await save(app,s.id,turns)
+			const res = await post(app,`/session/${s.id}/transcript`,{turns:restarted,final,replace:true})
+			expect(res.status).toBe(200)
+			expect((await store.getSession(s.id))?.transcript).toEqual(restarted)
+		})
+
+		it('replace:false protects like leaving it out',async () => {
+			const {app,s} = await setup()
+			await save(app,s.id,turns)
+			await errOf(await post(app,`/session/${s.id}/transcript`,{turns:restarted,final:false,replace:false}),409,'invalid_state')
+		})
+
+		it('replace:true can not remove turns',async () => {
+			const {app,s,store} = await setup()
+			await save(app,s.id,turns)
+			const e = await errOf(await post(app,`/session/${s.id}/transcript`,{turns:turns.slice(0,1),final:false,replace:true}),409,'invalid_state')
+			expect(e.details).toEqual({stored_turns:2})
+			expect((await store.getSession(s.id))?.transcript).toEqual(turns)
+		})
+
+		it('replace:true can not change a frozen transcript',async () => {
+			const {app,s,store} = await setup()
+			await save(app,s.id,turns,true)
+			await errOf(await post(app,`/session/${s.id}/transcript`,{turns:restarted,final:true,replace:true}),409,'invalid_state')
+			expect(await store.getSession(s.id)).toMatchObject({status:'completed',transcript:turns})
+		})
+
+		it('replace must be a boolean',async () => {
+			const {app,s} = await setup()
+			await errOf(await post(app,`/session/${s.id}/transcript`,{turns,final:false,replace:'yes'}),400,'bad_request')
+		})
+
+		it('an answer can keep growing while it is spoken',async () => {
+			const {app,s,store} = await setup()
+			await save(app,s.id,[turns[0],{role:'candidate',text:'We moved'}])
+			expect((await save(app,s.id,turns)).status).toBe(200)
+			expect((await store.getSession(s.id))?.transcript).toEqual(turns)
+		})
+
+		it('the interviewer text and a question_id are no answer, they can change',async () => {
+			const {app,s,store} = await setup()
+			await save(app,s.id,turns)
+			const next:Turn[] = [{role:'interviewer',text:'Reworded question'},{...turns[1],question_id:randomUUID()}]
+			expect((await save(app,s.id,next)).status).toBe(200)
+			expect((await store.getSession(s.id))?.transcript).toEqual(next)
+		})
+
+		it.each(['','  ','...','🙂'])('a stored answer of %j holds nothing to lose',async (text) => {
+			const {app,s,store} = await setup()
+			await save(app,s.id,[turns[0],{role:'candidate',text}])
+			expect((await save(app,s.id,restarted)).status).toBe(200)
+			expect((await store.getSession(s.id))?.transcript).toEqual(restarted)
+		})
+
+		it('the same list again is fine',async () => {
+			const {app,s} = await setup()
+			await save(app,s.id,turns)
+			expect((await save(app,s.id,turns)).status).toBe(200)
+		})
+
+		it('a save that lost the race checks the answers again',async () => {
+			const {app,s,store} = await setup()
+			await save(app,s.id,[turns[0]])
+			const {atWrite,go} = holdWrite(store,3)
+			const late = save(app,s.id,[turns[0],{role:'candidate',text:'lol'},{role:'candidate',text:'late'}])
+			await atWrite
+			expect((await save(app,s.id,turns)).status).toBe(200)
+			go()
+			const e = await errOf(await late,409,'invalid_state')
+			expect(e.details).toEqual({stored_turns:2,changed_turn:1})
+			expect((await store.getSession(s.id))?.transcript).toEqual(turns)
+		})
+	})
+
+	it('a save that keeps colliding gets a retryable session_conflict, not a lost write',async () => {
+		const {app,s,store} = await setup()
+		let tries = 0
+		store.saveTranscript = async () => {
+			tries++
+			return null
+		}
+		const e = await errOf(await save(app,s.id,turns),409,'session_conflict')
+		expect(e.retryable).toBe(true)
+		expect(tries).toBeGreaterThan(1)
+	})
+
 	it('names the stored turns on a frozen session too, and the full resend still works',async () => {
 		const {app,s,store} = await setup()
 		const done = await save(app,s.id,turns,true).then((r) => r.json())
@@ -485,7 +708,7 @@ describe('POST /session/:id/transcript',() => {
 
 	it.each(NO_ANSWER)('/grade agrees on %s',async (name,t) => {
 		const {app,s,store} = await setup()
-		await store.saveTranscript(s.id,['created'],t,'completed')
+		await store.saveTranscript(s.id,['created'],t,'completed',s.updated_at)
 		await errOf(await post(app,'/grade',{session_id:s.id}),422,'no_candidate_answers')
 	})
 

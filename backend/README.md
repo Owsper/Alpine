@@ -111,7 +111,7 @@ $env:DEMO_MODE='1'; npm start
 
 Or set `DEMO_MODE=1` in `.env`. Only `demo:true` requests work without a key. A normal `/research` or a transcript other than the demo ones gets `llm_unavailable`.
 
-Get the job description and the two transcripts from `GET /demo`, then run the normal flow with `demo:true` on `/research` or on `/session` with a job description. Research and the first session use stored data with no LLM call. `/grade` and `/next` try the LLM first and fall back to canned results, after 45 s and 30 s at most if it hangs. The canned scores are only ever used for the exact demo transcripts. Details in [docs/api.md](docs/api.md#demo-mode).
+Get the company, role, job description and the two transcripts from `GET /demo`, then run the normal flow with `demo:true` on `/research` or on `/session` with a job description. Research and the first session use stored data with no LLM call. So do `/grade` and `/next` on the two exact demo transcripts, even when the LLM works, because the live grader does not always pick the weakest pair the follow-up transcript was written for. Any other transcript is graded live, and `/next` after it tries the LLM for up to 30 s and then uses the canned questions. Details in [docs/api.md](docs/api.md#demo-mode).
 
 The stored data is in `src/demo/`. The job description is a marked sample. The 8 company facts were compared by hand with the live pages on 2026-11-02. They are short rewrites from before claims became verbatim sentences, so they differ from what `/research` returns now. They go out of date, but **do not refresh them right before a demo**. Refreshing replaces them with whatever this run picks, so read the diff and run `npm test` afterwards :
 
@@ -127,3 +127,4 @@ It only captures N26, because the job, questions and transcripts are written for
 - **Supabase** : the EU project still has to be created, nothing is persisted until then.
 - **Retention** : nothing enforces the 12 month transcript retention, data stays until the user deletes it.
 - **Relay key** : it was pasted in a chat, rotate it.
+- **Relay host** : `main` still tracks it in `backend/.env.example` and as a default in `backend/app/config.py`, from commit 8a934c2. This branch has neither. Remove it from those two files and keep it out of any merge of `main`. Rewriting history is the owner's call.

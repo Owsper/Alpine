@@ -46,7 +46,7 @@ export function createApp(given:Deps) {
 	app.get('/demo',(c) => {
 		if (!deps.demo) throw new ApiErr('not_found','demo mode is off')
 		const r = deps.demo.research()
-		return c.json({job_description:r.job_description,company_url:r.company_url,transcript:deps.demo.transcript(),followup_transcript:deps.demo.followupTranscript()})
+		return c.json({company_name:r.company_name,role_title:r.role_title,job_description:r.job_description,company_url:r.company_url,transcript:deps.demo.transcript(),followup_transcript:deps.demo.followupTranscript()})
 	})
 
 	app.route('/',researchRoutes(deps))

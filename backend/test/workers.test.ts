@@ -90,6 +90,28 @@ describe('a page that runs the parser out of heap',() => {
 	},30000)
 })
 
+describe('a hostile page at the 3 MB fetch limit',() => {
+	const MAX = 3 * 1024 * 1024
+	const fill = (unit:string) => unit.repeat(Math.floor(MAX / unit.length))
+
+	it.each([
+		['nested divs',fill('<div>')],
+		['open p tags',fill('<p>')],
+		['the formatting bomb, over and over',fill(BOMB)],
+	])('%s gives null inside the hard stop and the server keeps running',async (name,html) => {
+		logs()
+		const t0 = Date.now()
+		expect(await parseHtml(html)).toBeNull()
+		expect(Date.now() - t0).toBeLessThan(5000)
+		expect((await parseHtml('<p>still working</p>'))?.text).toBe('still working')
+	},30000)
+
+	it('an honest page that size parses well inside the hard stop',async () => {
+		const out = await parseHtml(fill('<p>Acme builds warehouse robots for retailers across Europe.</p>'))
+		expect(out?.text).toContain('Acme builds warehouse robots')
+	},30000)
+})
+
 describe('concurrency-3 : the time limit starts when a worker takes the job',() => {
 	it('a job that had to wait still gets its time',async () => {
 		await warm()

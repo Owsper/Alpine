@@ -2,11 +2,11 @@ import {randomUUID} from 'node:crypto'
 import {Hono} from 'hono'
 import {z} from 'zod'
 import {Id,type Dim,type Fact,type Job,type Question,type Score,type Session} from './contracts'
-import type {Deps} from './deps'
+import type {Demo,Deps} from './deps'
 import {ApiErr} from './errors'
 import {DEMO_MS,withDeadline} from './llm'
 import {buildFlow,interviewerInstructions,pub} from './session'
-import {allNew,badQuestion,clean} from './text'
+import {allNew,badQuestion,clean,NOT_THE_COMPANY} from './text'
 import {genOf,stillThere} from './user'
 
 const Body = z.object({session_id:Id})
@@ -40,6 +40,7 @@ Return JSON with weak, an array of exactly 3 question texts, and new, one questi
 Aim the weak questions at what the feedback says the candidate missed, without quoting the feedback back.
 Never repeat or rephrase anything in excluded_questions.
 Mention the company only through the listed facts, never invent facts.
+${NOT_THE_COMPANY}
 Never ask about emotion, confidence, personality, nervousness, voice or accent.
 Never ask about age, family, health, religion, origin or other protected traits.
 Each text is one short question that can be asked out loud, with no numbering.
@@ -75,6 +76,9 @@ export function nextRoutes(deps:Deps) {
 	async function genQuestions(job:Job,src:Session,score:Score,past:Session[],facts:Fact[]) {
 		const anchor = src.questions.find((q) => q.kind === 'anchor') ?? past[0].questions.find((q) => q.kind === 'anchor')
 		if (!anchor) throw new ApiErr('internal','first session has no anchor')
+		const bank = (demo:Demo) => demo.nextQuestions(score.weakest).map((q) => q.kind === 'anchor' ? {...q,text:anchor.text} : q)
+		// the follow-up transcript answers the bank, so a canned transcript that got new questions would answer what the session never asked
+		if (job.demo && deps.demo?.isDemoTranscript(src.transcript ?? [])) return bank(deps.demo)
 		const ask = (signal?:AbortSignal) => deps.llm.json({
 			name:'next',
 			schema:outFor(past),
@@ -86,7 +90,7 @@ export function nextRoutes(deps:Deps) {
 			return assemble(await (job.demo && deps.demo ? withDeadline(DEMO_MS,ask) : ask()),anchor,score.weakest)
 		} catch(e) {
 			if (!job.demo || !deps.demo) throw e
-			return deps.demo.nextQuestions(score.weakest).map((q) => q.kind === 'anchor' ? {...q,text:anchor.text} : q)
+			return bank(deps.demo)
 		}
 	}
 
