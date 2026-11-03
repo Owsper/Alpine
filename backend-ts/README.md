@@ -3,6 +3,8 @@
 Interview practice API : job description, sourced company facts, session, transcript, grading, next session.
 Practice tool only. Not for hiring or selection. Text of the answers only, no audio.
 
+`main` also has a FastAPI backend in `backend/`, with its frontend wired to it. This is a separate backend, kept in `backend-ts/` so the two do not collide. The team still has to pick one.
+
 Frontend contract (draft) : [docs/api.md](docs/api.md). Screen by screen wiring, field map and the decisions the frontend team has to make : [docs/frontend.md](docs/frontend.md).
 
 ## Setup
@@ -10,7 +12,7 @@ Frontend contract (draft) : [docs/api.md](docs/api.md). Screen by screen wiring,
 Needs Node 22.12 or newer (22, 24 or 26 and up, the test tools do not support 23 or 25), tested on 24.
 
 ```
-cd backend
+cd backend-ts
 npm install
 cp .env.example .env
 ```
@@ -98,7 +100,7 @@ Lets a demo survive an LLM or network outage. It always uses the memory store, e
 **Frontend teammates start here.** It needs no relay key : `LLM_BASE_URL` and `LLM_API_KEY` can stay empty, the LLM steps fail at once and use the canned data. Copy the env file once, then start :
 
 ```
-cd backend
+cd backend-ts
 npm install
 cp .env.example .env
 
@@ -127,4 +129,4 @@ It only captures N26, because the job, questions and transcripts are written for
 - **Supabase** : the EU project still has to be created, nothing is persisted until then.
 - **Retention** : nothing enforces the 12 month transcript retention, data stays until the user deletes it.
 - **Relay key** : it was pasted in a chat, rotate it.
-- **Relay host** : `main` still tracks it in `backend/.env.example` and as a default in `backend/app/config.py`, from commit 8a934c2. This branch has neither. Remove it from those two files and keep it out of any merge of `main`. Rewriting history is the owner's call.
+- **Relay host** : `main` still tracks it in `backend/.env.example` and as a default in `backend/app/config.py`, from commit 8a934c2. This branch has neither. Remove it from those two files. Rewriting history is the owner's call.
