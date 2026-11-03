@@ -14,8 +14,10 @@ const CLIENT_SHARE = 0.2
 // one /grade round is 3 calls, a share below that can never finish one
 const MIN_SHARE = 3
 
-// a demo job stops waiting here and uses canned questions aimed at the same weak dimensions. A healthy /next took 19 to 40 s live
+// a demo job stops waiting here and uses canned questions aimed at the same weak dimensions. A healthy /next took a median of 27 s and up to 64 s live under load
 export const DEMO_MS = 30000
+
+export const rejected = (why:string) => '\n\nYour last answer was rejected. ' + why + ' Write it again.'
 
 export const llmClient = new AsyncLocalStorage<string>()
 
@@ -169,9 +171,12 @@ export function createLlm(env:Env,connectMs = 4000):Llm {
 	}
 
 	async function tryModel<T>(model:string,o:LlmCall<T>,schema:Record<string,unknown>) {
+		let why = ''
 		for (let i = 0; i < 2; i++) {
-			const out = decode(o.schema,await call(model,o,schema))
+			const out = decode(o.schema,await call(model,{...o,system:o.system + why},schema))
 			if (out?.success) return out.data
+			// asked the same way, the model repeats the mistake. Naming it up front costs twice the time on every call
+			if (out) why = rejected([...new Set(out.error.issues.map((e) => e.code === 'custom' ? e.message : e.path.join('.') + ' : ' + e.message + '.'))].join(' '))
 		}
 		throw new ApiErr('llm_bad_output','llm returned invalid output')
 	}

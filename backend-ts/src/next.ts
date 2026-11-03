@@ -6,19 +6,17 @@ import type {Demo,Deps} from './deps'
 import {ApiErr} from './errors'
 import {DEMO_MS,withDeadline} from './llm'
 import {buildFlow,interviewerInstructions,pub} from './session'
-import {allNew,badQuestion,clean,jobWords,NOT_THE_COMPANY} from './text'
+import {allNew,checkQuestions,clean,jobWords,NOT_THE_COMPANY,QUESTION_CHARS} from './text'
 import {genOf,stillThere} from './user'
 
 const Body = z.object({session_id:Id})
 const Text = z.string().trim().min(1)
 const Out = z.object({weak:z.array(Text).length(3),new:Text})
-const QUESTION_CHARS = 300
 
 // a repeat or a soft skill question would still look right in the 3/1/1 labels, so it fails like any other bad output
-const outFor = (past:Session[],words:Set<string>) => Out.refine((o) => {
-	const texts = [...o.weak,o.new]
-	return allNew(texts,past.flatMap((s) => s.questions.map((q) => q.text))) && !texts.some((t) => badQuestion(t,words))
-},'questions must be new and about the job only')
+const outFor = (past:Session[],words:Set<string>) => Out
+	.refine((o) => allNew([...o.weak,o.new],past.flatMap((s) => s.questions.map((q) => q.text))),'Every question must be new.')
+	.superRefine((o,ctx) => checkQuestions([...o.weak,o.new],words,ctx))
 
 const HINTS:Record<Dim,string> = {
 	star:'structuring an answer as situation, task, action, result',

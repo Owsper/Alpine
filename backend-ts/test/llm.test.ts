@@ -196,6 +196,48 @@ describe('bad output',() => {
 		expect(models()).toEqual([PRIMARY,PRIMARY])
 	})
 
+	const sys = () => seen.map((b) => b.messages[0].content)
+	const Picky = z.object({ok:z.boolean()}).refine((o) => o.ok,'Do not use these words : tone.')
+	const picky = () => llm().json({name:'t',schema:Picky,system:'SYS',user:'USER'})
+
+	it('tells the model what was wrong on the retry, the first call and the user message stay as they are',async () => {
+		replies = [ok('{"ok":false}'),ok('{"ok":true}')]
+		await expect(picky()).resolves.toEqual({ok:true})
+		expect(sys()[0]).toBe('SYS')
+		expect(sys()[1]).toBe('SYS\n\nYour last answer was rejected. Do not use these words : tone. Write it again.')
+		expect(seen.map((b) => b.messages[1].content)).toEqual(['USER','USER'])
+	})
+
+	it('names the field of a wrong shape, and says the same thing once',async () => {
+		const Shape = z.object({a:z.array(z.number().max(5)),b:z.string()})
+		replies = [ok('{"a":[6,7]}'),ok('{"a":[1],"b":"x"}')]
+		await llm().json({name:'t',schema:Shape,system:'SYS',user:'USER'})
+		expect(sys()[1]).toBe('SYS\n\nYour last answer was rejected. a.0 : Too big: expected number to be <=5. a.1 : Too big: expected number to be <=5. b : Invalid input: expected string, received undefined. Write it again.')
+	})
+
+	it('says a repeated custom message once',async () => {
+		const Twice = z.object({x:z.boolean(),y:z.boolean()}).superRefine((o,ctx) => {
+			ctx.addIssue({code:'custom',message:'Same thing.'})
+			ctx.addIssue({code:'custom',message:'Same thing.'})
+		})
+		replies = [ok('{"x":true,"y":true}'),ok('{"x":true,"y":true}')]
+		await expect(llm().json({name:'t',schema:Twice,system:'SYS',user:'USER'})).rejects.toThrow()
+		expect(sys()[1]).toBe('SYS\n\nYour last answer was rejected. Same thing. Write it again.')
+	})
+
+	it('has nothing to tell after output that is not json',async () => {
+		replies = [ok('nope'),ok('{"ok":true}')]
+		await expect(picky()).resolves.toEqual({ok:true})
+		expect(sys()).toEqual(['SYS','SYS'])
+	})
+
+	it('the reason from a failed model does not follow to the fallback',async () => {
+		replies = [ok('{"ok":false}'),fail(503),ok('{"ok":true}')]
+		await expect(picky()).resolves.toEqual({ok:true})
+		expect(models()).toEqual([PRIMARY,PRIMARY,FALLBACK])
+		expect(sys()[2]).toBe('SYS')
+	})
+
 	it.each([
 		['invalid json',ok('nope')],
 		['wrong shape',ok('{"ok":"yes"}')],

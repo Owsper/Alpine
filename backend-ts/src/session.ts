@@ -5,12 +5,11 @@ import {Id,Turn,type Fact,type FlowStep,type Job,type PublicSession,type Questio
 import type {Deps} from './deps'
 import {ApiErr} from './errors'
 import {DEMO_MS,type Llm,withDeadline} from './llm'
-import {allNew,badQuestion,clean,DISCLAIMER,hasAnswers,HAS_TEXT,jobWords,NOT_THE_COMPANY,okText} from './text'
+import {allNew,checkQuestions,clean,DISCLAIMER,hasAnswers,HAS_TEXT,jobWords,NOT_THE_COMPANY,okText,QUESTION_CHARS} from './text'
 import {genOf,stillThere} from './user'
 
 const MAX_TURNS = 300
 const MAX_CHARS = 60000
-const QUESTION_CHARS = 300
 const NUMBER_TRIES = 10
 const SAVE_TRIES = 10
 const OPEN:Status[] = ['created','in_progress']
@@ -24,12 +23,13 @@ const SaveTranscript = z.strictObject({turns:z.array(Turn),final:z.boolean(),rep
 const firstOut = (words:Set<string>) => z.object({
 	questions:z.array(z.object({text:z.string().trim().min(1),is_anchor:z.boolean()})).length(5)
 		.refine((qs) => qs.filter((q) => q.is_anchor).length === 1,'exactly one question must be the anchor')
-		.refine((qs) => !qs.some((q) => badQuestion(q.text,words)),'questions must be about the job only'),
+		.superRefine((qs,ctx) => checkQuestions(qs.map((q) => q.text),words,ctx)),
 })
 
 const laterOut = (past:string[],words:Set<string>) => z.object({
 	questions:z.array(z.object({text:z.string().trim().min(1)})).length(4)
-		.refine((qs) => allNew(qs.map((q) => q.text),past) && !qs.some((q) => badQuestion(q.text,words)),'questions must be new and about the job only'),
+		.refine((qs) => allNew(qs.map((q) => q.text),past),'Every question must be new.')
+		.superRefine((qs,ctx) => checkQuestions(qs.map((q) => q.text),words,ctx)),
 })
 
 const SYSTEM = `You write questions for a practice job interview. This is a practice tool, it is never used for hiring or selection.

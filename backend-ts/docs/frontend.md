@@ -62,7 +62,7 @@ The landing page calls nothing.
 - **Back on `/report` after step 7.** `sessionId` is already the new ungraded session, so `screens/Report.jsx:52` gets an error on both backends. `gradedSessionId` is set (`screens/Report.jsx:70`) and nothing reads it. Use it here and on Progress.
 - **Reload.** Flow state survives in `sessionStorage`, and `/grade` returns the stored score. During an interview the turns are in memory only (`voice/transcript.ts:1`), so a reload goes back to the lobby and the answers are gone, on both backends. backend-ts takes `final:false` saves if the team wants more, see [the route](api.md#post-sessionidtranscript).
 - **Stored id is gone, backend-ts only.** A restart on the memory store loses every id, and demo mode always uses that store. On `not_found` for a stored id, clear `jobId` and `sessionId`, keep `user_id`, and go back to `/start`.
-- **Waits**, from a few runs : `/research` 4 to 30 s, `/session` 13 to 23 s, `/grade` 17 to 69 s, `/next` 19 to 40 s. Details in [api.md](api.md#timing). FastAPI picks session and next questions from a bank with no LLM, so "Preparing…" (`screens/Interview.jsx:297`) and "Planning…" (`screens/Report.jsx:163`) will show much longer.
+- **Waits**, measured live : `/research` 4 to 30 s, `/session` median 13 s and up to 45 s, `/grade` median 34 s and up to 75 s, `/next` median 27 s and up to 64 s. Details in [api.md](api.md#timing). FastAPI picks session and next questions from a bank with no LLM, so "Preparing…" (`screens/Interview.jsx:297`) and "Planning…" (`screens/Report.jsx:163`) will show much longer.
 
 ## Field map
 
