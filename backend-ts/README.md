@@ -132,3 +132,12 @@ It only captures N26, because the job, questions and transcripts are written for
 - **Retention** : nothing enforces the 12 month transcript retention, data stays until the user deletes it.
 - **Relay key** : it was pasted in a chat, rotate it.
 - **Relay host** : `main` still tracks it in `backend/.env.example` and as a default in `backend/app/config.py`, from commit 8a934c2. This branch has neither. Remove it from those two files. Rewriting history is the owner's call.
+
+## Known limits
+
+- **Grade after a crash** : on a durable store, a process killed mid-grade leaves that session answering 409 `grading_in_progress` for up to 5 minutes, then a retry works. Poll `GET /session/:id` while waiting, retrying `/grade` hits the limit of 10 a minute.
+- **Call counts** : one `/grade` is 3 upstream calls when healthy, 9 on failed quotes and 18 on bad output. Output is about 8k to 16k tokens per grade.
+- **Repeated calls** : each `POST /session` makes a new session and spends an LLM call, so a double click makes two. The frontend has to guard it.
+- **Large bodies** : a body of 1 MB or more shows up as a network error in Chromium, not as 413, because the server closes the connection first. 300 KB gets the 413.
+- **Company coverage** : of 12 real companies tried, 8 gave 4 to 8 facts and 4 gave 0 or 1, with a warning. Some sites refuse crawlers or render with scripts only.
+- **Platform** : only run on Windows with Node 24.

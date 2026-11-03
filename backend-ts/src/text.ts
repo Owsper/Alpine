@@ -20,7 +20,18 @@ const AS_COMPANY_US = /(?<![\p{L}\p{N}])[Uu]s(?![\p{L}\p{N}])/u
 
 export const NOT_THE_COMPANY = 'Never speak as the company or its hiring team, you do not work there. Never use we, us, our or here for it, or the same words in any other language, even where the job description or facts do. Use its name, or say this role or this team.'
 
-export const badQuestion = (s:string) => BANNED.test(s) || PROTECTED.test(s) || AS_COMPANY.test(s) || AS_COMPANY_US.test(s)
+const ALL_BANNED = new RegExp(BANNED.source,'gi')
+// whole BANNED matches, so milestone does not allow tone
+const softWords = (s:string) => (s.match(ALL_BANNED) ?? []).map((w) => w.toLowerCase())
+// the first letters, so stress allows stressful. A pronounced eye for detail is not pronunciation
+const family = (w:string) => w === 'pronounced' ? w : w.slice(0,4)
+// apply now lines say nothing about the job. Copy that sounds like the brand or a child who hesitates in speech does
+const FILLER = /\bsounds? like you|\b(this|(if|does) (that|it)) sounds?|(not|never|without|n['’]t)( be)? hesita\w*/gi
+
+export const jobWords = (job:string,facts:{claim:string}[]) => new Set([job,...facts.map((f) => f.claim)].flatMap((t) => softWords(t.replace(FILLER,' '))).map(family))
+
+// a banned word the job's own text uses is about the job. The grader's tips have no such exemption
+export const badQuestion = (s:string,allowed:Set<string>) => softWords(s).some((w) => !allowed.has(family(w))) || PROTECTED.test(s) || AS_COMPANY.test(s) || AS_COMPANY_US.test(s)
 
 const same = (s:string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim()
 
