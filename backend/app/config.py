@@ -16,7 +16,7 @@ DATABASE_PATH = os.environ.get("DATABASE_PATH", "interviewverse.db")
 LLM_BASE_URL = os.environ.get("LLM_BASE_URL", "https://relay.crunchman.info/v1").rstrip("/")
 LLM_API_KEY = os.environ.get("LLM_API_KEY", "")
 # Asked in parallel; the first model to return valid JSON wins. The relay's latency spikes per model.
-LLM_MODELS = [m.strip() for m in os.environ.get("LLM_MODELS", "zai-org/GLM-5.3-Flash,nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B").split(",") if m.strip()]
+LLM_MODELS = [m.strip() for m in os.environ.get("LLM_MODELS", "nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B,deepseek-ai/DeepSeek-V4.1-Flash").split(",") if m.strip()]
 LLM_TIMEOUT_S = float(os.environ.get("LLM_TIMEOUT_S", "40"))
 
 # Demo mode: cached research for the demo company and a rule-based grader if every model fails,
