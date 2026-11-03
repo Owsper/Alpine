@@ -35,16 +35,17 @@ POST /next                            plan + the next session, already created
 
 `/research`, `/session`, `/grade` and `/next` call an LLM and take seconds. Show progress and set a client timeout of at least 3 minutes on them.
 
-Measured on 2026-11-02 against the real relay on the memory store. These are two runs, not a benchmark. All other routes answered in under 20 ms, Supabase will add network time to every route and that has not been measured.
+Measured against the real relay on the memory store, not a benchmark : `/research` on 2026-11-02 in two runs, `/session`, `/grade` and `/next` on 2026-11-03 under load, with rate limits that pushed many calls to the faster fallback model. All other routes answered in under 20 ms, Supabase will add network time to every route and that has not been measured.
 
 | Call | Time |
 | --- | --- |
 | `POST /research`, first time for a company | 4 to 30 s. 4 to 23 s over 15 job descriptions, then up to 30 s after the prompt change below. Each site that gives no facts adds an LLM call, at most 4 sites are tried. Since then the facts prompt names what code throws away, which took that one call from 9.0 to 14.5 s on average over 9 calls on the 2026-11-03 relay |
 | `POST /research`, facts cached | 13.0 s (the company name is still extracted by the LLM) |
-| `POST /session` | 13.0 s, 23.0 s and 13.1 s |
-| `POST /grade` | 16.6 s, 29.3 s and 36.9 s. Later that day 22 to 67 s over 8 rounds of the grader alone, and 68.8 s through the route |
+| `POST /session`, first of a job | Median 13 s, up to 45 s over 52 tries. Around 25 s where the first answer gets rejected, see [the route](#post-session) |
+| `POST /session`, later of a job | Median 19 s, up to 43 s over 12 tries |
+| `POST /grade` | Median 34 s, up to 75 s over 52 rounds. All three runs on the main model : median 36 s, up to 57 s over 22 rounds. All on the fallback : median 14 s, up to 36 s over 7 rounds |
 | `POST /grade`, already graded | 2 ms |
-| `POST /next` | 19.3 s and 39.6 s |
+| `POST /next` | Median 27 s, up to 64 s over 40 calls |
 | `POST /next`, plan already exists | 2 ms |
 
 If the client gives up on `/grade`, for example after a reload, the server keeps grading. To wait for it poll `GET /session/:id` every few seconds until `status` is `graded`, it has no rate limit and it returns the score. While polling, `status` `completed` with `grading_started_at` null means no grade is running any more, because it failed : stop polling and call `POST /grade` again or show the error. Do not poll `POST /grade` : it counts against the limit of 10 per minute, so a poll every 3 s gets `rate_limited` at about 30 s, right when a slow grade finishes.
@@ -224,9 +225,9 @@ Creates a session with exactly 5 questions : 4 `base` and 1 `anchor`. The anchor
 
 Generated questions follow the language of the job description and never speak as the company : output with we, us or our, or the German or French for those, counts as invalid. The same goes for `/next`. `US` in capitals is fine.
 
-Generated questions also stay off emotion, confidence, personality and how someone sounds : a word like calm, stress, confident, voice, tone or fluent counts as invalid output, unless the job description or the company facts use that word. Then it is about the job, so a posting that says "voice disorders" can get a question about a voice disorder and a company called Calm can be named. `stress` in the job text also allows `stressful`, `milestone` does not allow `tone`, and `stress test` does not allow `stress`. Apply now lines allow nothing, like `if this sounds like you` or `do not hesitate to apply`, while `copy that sounds like the brand` still counts. `pronounced` only allows itself, not `pronunciation`. The same goes for `/next`. Protected traits and speaking as the company get no such exemption, and neither do the tips from `/grade`, whatever the job says.
+Generated questions also stay off emotion, confidence, personality and how someone sounds : a word like calm, stress, confident, voice, tone or fluent counts as invalid output, unless the job description or the company facts use that word or a form of it, compared on the first 4 letters. Then it is about the job, so a posting that says "voice disorders" can get a question about a voice disorder and a company called Calm can be named. `stress` in the job text also allows `stressful`, `milestone` does not allow `tone`, and `stress test` does not allow `stress`. Apply now lines allow nothing, like `if this sounds like you` or `do not hesitate to apply`, while `copy that sounds like the brand` still counts. `pronounced` only allows itself, not `pronunciation`. The same goes for `/next`. Protected traits and speaking as the company get no such exemption, and neither do the tips from `/grade`, whatever the job says.
 
-The server asks the model twice, then answers `llm_bad_output`, and a retry usually works. Measured on 2026-11-03 through this route with `job_description` : 217 of 220 tries returned 200 over plain, tech and such postings. All 3 others used a word of this kind that the posting did not, twice in a row. Some postings do worse, because the model reaches for a related word the posting never used : a copywriter posting that got `voice` returned 200 on 4 of 8 tries, a speech therapist posting that got `fluency` on 3 of 8.
+The server asks the model twice, the second time saying which words were rejected, then answers `llm_bad_output`, and a retry usually works. Measured on 2026-11-03 through this route with `job_description` : 81 of 83 tries returned 200 over plain, tech and such postings. Both others were a copywriter posting where the model got `voice` rejected and then wrote `tone`. That posting and a speech therapist posting are the worst seen, because the model reaches for a word the posting never used : they went from 4 of 8 and 3 of 8 before the second ask said why to 14 of 16 and 16 of 16, where 9 of the 32 tries ran on the fallback, which rejects less. On the main model alone that is 10 of 12 and 11 of 11. On the main model the first answer on them is nearly always rejected, 21 of 23, so such a session costs two calls.
 
 `progress` only appears on sessions made by `/next`. A session made here on an existing job starts a fresh comparison.
 
@@ -346,6 +347,10 @@ Errors : `bad_request` (`details` names a turn with characters that can't be sto
 ### POST /grade
 
 Scores a `completed` session. Returns the stored score if it was already graded, with no new LLM calls.
+
+A `tip` never contains a banned English word like calm, tone, stress or confident, whatever the job says. The check is English whole words and skips phrases like `confidence level` or `voice of`, so a German `Stressbewältigung` gets through. When the model writes one, only that tip is dropped and the score and quote stay. The tip then comes from another of the three runs, or is a fixed tip for that dimension, which says less about this candidate. The fixed tip is in English. It appeared on 46 of 1692 dimensions in live runs on a set weighted to such postings : 45 came from 5 postings where the company name or the main need holds such a word, about half the rounds, and 1 from the other 131 rounds.
+
+Every `evidence_quote` has to be word for word from the candidate. A run that breaks this is asked again, saying so, with at most 3 tries per run. If one of the three runs still has no valid quote the round answers `llm_bad_output`, nothing is stored and it can be retried. That did not happen in 76 measured rounds with this second ask. Without it, it happened in 1 of 344, and in 0 of 76 in the side by side run, so rounds alone can not tell the two apart. Per call, misquotes on the worst posting went from 13 of 215 to 2 of 140.
 
 ```json
 {"session_id":"a1b2c3d4-0002-4a00-8a00-000000000001"}
@@ -520,7 +525,7 @@ These `details` fields are part of the contract : `stored_turns` on `invalid_sta
 | `store_unavailable` | 503 | yes | The database is down or did not answer in 10 s. Any route that reads or writes can return this, and nothing was lost if you retry | Retry with backoff, keep the transcript |
 | `llm_timeout` | 504 | yes | The LLM provider timed out | Retry with backoff |
 
-`llm_*` above means `llm_rate_limited`, `llm_bad_output`, `llm_unavailable`, `llm_config` and `llm_timeout`. The server already tries a fallback model before returning most of these, so a short backoff of a few seconds is enough, with a limit of about 3 tries.
+`llm_*` above means `llm_rate_limited`, `llm_bad_output`, `llm_unavailable`, `llm_config` and `llm_timeout`. The server tries a fallback model after outages, rate limits, timeouts and cut off output, so a short backoff of a few seconds is enough, with a limit of about 3 tries. Other bad output stays on the same model : it asks a second time, and says what was wrong if the answer was JSON that failed a check. An answer that is not JSON is asked again unchanged.
 
 ## Demo mode
 

@@ -634,8 +634,10 @@ describe('spec-12e : evidence quotes prove something',() => {
 describe('privacy-demo-11 : soft skill backstop',() => {
 	const tip = async (t:string) => runGrader(fakeLlm({grade:() => gradeRun({tip:t})}),{description:'x',facts:[],questions:[],turns:TURNS})
 
-	it.each(['Use a more upbeat tone','Use a stronger voice','Sound more enthusiastic','Be more assertive','Do not hesitate','Your shyness shows','Your pacing and intonation were off','Your tone was flat','Stay calm','Be more fluent'])('rejects the tip %j',async (t) => {
-		await expect(tip(t)).rejects.toMatchObject({code:'llm_bad_output'})
+	it.each(['Use a more upbeat tone','Use a stronger voice','Sound more enthusiastic','Be more assertive','Do not hesitate','Your shyness shows','Your pacing and intonation were off','Your tone was flat','Stay calm','Be more fluent'])('never shows the tip %j',async (t) => {
+		const r = await tip(t)
+		expect(r.scores.some((s) => s.tip === t)).toBe(false)
+		expect(r.scores.every((s) => s.tip.length > 0)).toBe(true)
 	})
 
 	it.each(['Mention how you ran a stress test','Add the stress-testing numbers','Quote the voice of the customer','Report the confidence interval'])('keeps the tip %j',async (t) => {

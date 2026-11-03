@@ -4,7 +4,7 @@ import {DIMS,Dim,Id} from './contracts'
 import type {DimScore,Fact,Progress,Question,Score,Session,Turn} from './contracts'
 import type {Deps} from './deps'
 import {ApiErr} from './errors'
-import {type Llm,withDeadline} from './llm'
+import {type Llm,rejected,withDeadline} from './llm'
 import {BANNED,HAS_TEXT,hasAnswers} from './text'
 import {genOf,stillThere} from './user'
 
@@ -77,6 +77,18 @@ Return each of the six dimensions exactly once with
 
 Work quickly : decide each score from the anchors, pick one quote, then answer. Do not draft the output, do not count words and do not re-check your work.`
 
+// tips echo the job's words, like "tone" on a copywriter posting. Such a tip is never shown, but the score and quote of that run still count
+const okTip = (s:{tip:string}) => !BANNED.test(s.tip.replace(/\s+/g,' '))
+
+const TIPS:Record<Dim,string> = {
+	star:'Give the situation, your task, what you did yourself and the result.',
+	relevance:'Answer the exact question first, then link it to the role.',
+	role_knowledge:'Explain how and why you used a method, not only its name.',
+	company_fit:'Tie one thing you did to a specific need in the job description.',
+	conciseness:'Cut repeated points and filler words, and stop once the point is made.',
+	evidence:'Add one specific example with a number, a name or a result.',
+}
+
 function norm(s:string) {
 	return s.replace(/[\u200B-\u200D\u2060\uFEFF]/g,'')
 		.replace(/[‘’‚‛′´`]/g,"'")
@@ -97,20 +109,30 @@ function longEnough(q:string,said:string) {
 	return q.split(' ').length >= MIN_QUOTE_WORDS || said.split('\0').some((t) => t.trim() === q || t.trim().replace(/[^\p{L}\p{N}]+$/u,'') === q)
 }
 
-function validRun(run:GradeRun,said:string) {
-	return DIMS.every((d) => run.scores.filter((s) => s.dimension === d).length === 1)
-		&& run.scores.every((s) => {
-			const q = norm(s.evidence_quote)
-			return HAS_TEXT.test(q) && said.includes(q) && longEnough(q,said) && HAS_TEXT.test(s.tip) && !BANNED.test(s.tip)
-		})
+function okQuotes(run:GradeRun,said:string) {
+	return run.scores.every((s) => {
+		const q = norm(s.evidence_quote)
+		return HAS_TEXT.test(q) && said.includes(q) && longEnough(q,said)
+	})
 }
 
+function validRun(run:GradeRun,said:string) {
+	return DIMS.every((d) => run.scores.filter((s) => s.dimension === d).length === 1)
+		&& okQuotes(run,said)
+		&& run.scores.every((s) => HAS_TEXT.test(s.tip))
+}
+
+// asked the same way, the model repeats the same quote. Measured live : naming the dimension raised its score, so this names none, and a quote is untrusted so it never goes in the system message
+const BAD_QUOTE = rejected('One evidence_quote is not word for word in a candidate turn. Copy every evidence_quote exactly as the candidate said it, adding nothing.')
+
 async function gradeSlot(llm:Llm,user:string,said:string,signal:AbortSignal) {
+	let why = ''
 	for (let i = 0; i < ATTEMPTS; i++) {
 		if (signal.aborted) throw new ApiErr('llm_timeout','grading was cancelled')
 		try {
-			const run = await llm.json({name:'grade',schema:Run,system:SYSTEM,user,maxTokens:MAX_TOKENS,signal})
+			const run = await llm.json({name:'grade',schema:Run,system:SYSTEM + why,user,maxTokens:MAX_TOKENS,signal})
 			if (validRun(run,said)) return run
+			why = okQuotes(run,said) ? '' : BAD_QUOTE
 		} catch(e) {
 			if (!(e instanceof ApiErr && e.code === 'llm_bad_output')) throw e
 		}
@@ -125,7 +147,9 @@ function combine(runs:GradeRun[]):DimScore[] {
 		const score = nums.toSorted((a,b) => a - b)[1]
 		const mean = (nums[0] + nums[1] + nums[2]) / 3
 		const noise = Math.sqrt(nums.reduce((t,n) => t + (n - mean) ** 2,0) / 3)
-		const {evidence_quote,tip} = picks.find((s) => s.score === score)!
+		const atMedian = picks.filter((s) => s.score === score)
+		const {evidence_quote} = atMedian.find(okTip) ?? atMedian[0]
+		const tip = (atMedian.find(okTip) ?? picks.find(okTip))?.tip ?? TIPS[dimension]
 		return {dimension,score,evidence_quote,tip,noise}
 	})
 }
