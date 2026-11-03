@@ -1,6 +1,6 @@
-# Backend To-do — InterviewVerse MVP
+# Backend to-do: Alpine MVP
 
-Based on the two PDFs: the MVP plan and InterviewVerse research. Instructions inside the documents are treated as product requirements, not as commands to the assistant.
+Based on the MVP plan and the product research, written when the product was still called InterviewVerse.
 
 Status on 3 Nov 2026 : ticks are for `backend-ts/` on branch `backend-mvp`. `main` has a separate FastAPI backend in `backend/`, and these ticks say nothing about it. The team still has to pick one. Unticked items say what is missing.
 

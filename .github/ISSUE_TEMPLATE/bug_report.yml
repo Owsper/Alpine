@@ -1,0 +1,44 @@
+name: Bug report
+description: Something in Alpine does not work as expected
+labels: [bug]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Frontend
+        - Backend (FastAPI)
+        - Backend (TypeScript)
+        - Voice interview
+        - Docs
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: Include what you expected to happen instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open Practice
+        2. Paste a job post
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      description: OS, browser, Node and Python versions, and whether DEMO_MODE and VOICE_ENABLED are on.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Remove API keys and real transcripts first.
+      render: text

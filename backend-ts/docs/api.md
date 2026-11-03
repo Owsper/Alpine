@@ -1,4 +1,4 @@
-# InterviewVerse API
+# Alpine API (TypeScript backend)
 
 > **DRAFT.** Pending sign-off by the frontend developer. Nothing here is frozen until then. See [Open points](#open-points-for-sign-off).
 

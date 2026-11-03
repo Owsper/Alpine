@@ -1,4 +1,4 @@
-# InterviewVerse backend
+# Alpine backend (TypeScript)
 
 Interview practice API : job description, sourced company facts, session, transcript, grading, next session.
 Practice tool only. Not for hiring or selection. Text of the answers only, no audio.
