@@ -107,3 +107,17 @@ def test_transcript_is_locked_after_grading(client):
     client.post("/api/grade", json={"session_id": session["sessionId"]})
     locked = client.post(f"/api/session/{session['sessionId']}/transcript", json={"turns": turns, "durationSec": 120})
     assert locked.status_code == 409 and locked.json()["error"]["code"] == "already_graded"
+
+
+def test_sessions_list_feeds_the_dashboard(client):
+    job_id = client.post("/api/research", json={"company": "Acme Robotics", "role": "SWE", "description": "Fleet control in Go and TypeScript."}).json()["job"]["id"]
+    session = client.post("/api/session", json={"job_id": job_id}).json()
+    assert client.get("/api/sessions").json()["sessions"] == []
+    client.post(f"/api/session/{session['sessionId']}/transcript", json={"turns": answer_turns(session), "durationSec": 120})
+    client.post("/api/grade", json={"session_id": session["sessionId"]})
+    client.post("/api/next", json={"session_id": session["sessionId"]})
+    listed = client.get("/api/sessions").json()
+    assert [s["sessionId"] for s in listed["sessions"]] == [session["sessionId"]]
+    assert listed["sessions"][0]["transcript"]["turns"] and len(listed["sessions"][0]["scores"]) == 6
+    assert "runs" not in listed["sessions"][0]["scores"][0]
+    assert listed["upcoming"]["jobId"] == job_id and listed["upcoming"]["status"] == "created"

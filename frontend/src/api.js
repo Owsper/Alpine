@@ -36,21 +36,10 @@ export const api = {
   grade,
   next: (sessionId) => call('/next', { method: 'POST', body: { session_id: sessionId } }),
   progress: (jobId) => call(`/progress/${jobId}`),
+  sessions: () => call('/sessions'),
   voiceStatus: () => call('/voice/status'),
 }
 
 // The backend names STAR plainly; the dashboard spells it out.
 export const DIMENSION_LABELS = { STAR: 'STAR structure' }
 export const label = (dimension) => DIMENSION_LABELS[dimension] ?? dimension
-
-/** Backend facts in the shape the Research screen already renders. */
-export function toFacts(facts) {
-  return facts.map((fact, i) => ({
-    id: `f${i}`,
-    tag: fact.source_label,
-    text: fact.claim,
-    url: fact.source_url.startsWith('http') ? fact.source_url : null,
-    source: fact.source_url.startsWith('http') ? fact.source_url.replace(/^https?:\/\//, '') : 'The job posting you pasted',
-    retrieved: new Date(fact.retrieved_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
-  }))
-}

@@ -1,24 +1,12 @@
-import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter, HashRouter } from 'react-router-dom'
-import '@fontsource-variable/inter'
-import '@fontsource-variable/bricolage-grotesque'
+import { HashRouter } from 'react-router-dom'
 import App from './App.jsx'
-import { FlowProvider } from './flow.jsx'
-import './styles.css'
-import './layout.css'
-import './call.css'
-import './motion.css'
+import './alpine.css'
 
-// Opened straight from disk there is no server to answer /research, so routes live in the hash.
-const Router = window.location.protocol === 'file:' ? HashRouter : BrowserRouter
-
+// No StrictMode: its double effects would start the microphone and the interview twice.
+// Hash routes (app.html#/practice) work from the dev server, a static host or a plain file.
 createRoot(document.getElementById('root')).render(
-  <StrictMode>
-    <Router>
-      <FlowProvider>
-        <App />
-      </FlowProvider>
-    </Router>
-  </StrictMode>,
+  <HashRouter>
+    <App />
+  </HashRouter>,
 )

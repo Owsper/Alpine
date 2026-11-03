@@ -248,6 +248,39 @@ def progress(job_id: str) -> dict:
         return {"jobId": job_id, "sessions": [{"sessionId": s["id"], "number": s["number"], "scores": scores_for(conn, s["id"])} for s in sessions]}
 
 
+@app.get("/api/sessions")
+def list_sessions() -> dict:
+    """Every finished session across jobs, newest first, plus the next planned one, for the dashboard."""
+    with db.tx() as conn:
+        sessions = db.rows(
+            conn.execute(
+                "SELECT s.*, j.title AS role, j.company AS company FROM sessions s JOIN jobs j ON j.id = s.job_id "
+                "WHERE s.status IN ('completed', 'graded') ORDER BY s.created_at DESC"
+            )
+        )
+        finished = [
+            {
+                "sessionId": s["id"],
+                "jobId": s["job_id"],
+                "number": s["number"],
+                "status": s["status"],
+                "createdAt": s["created_at"],
+                "role": s["role"],
+                "company": s["company"],
+                "questions": s["questions"],
+                "transcript": s["transcript"],
+                "scores": [{k: v for k, v in score.items() if k != "runs"} for score in scores_for(conn, s["id"])],
+            }
+            for s in sessions
+        ]
+        planned = db.row(conn.execute("SELECT * FROM sessions WHERE status = 'created' ORDER BY created_at DESC LIMIT 1").fetchone())
+        upcoming = None
+        if planned:
+            job = get_job(conn, planned["job_id"])
+            upcoming = public_session(planned, job, facts_for(conn, job["id"]))
+        return {"sessions": finished, "upcoming": upcoming, "dimensions": config.DIMENSIONS}
+
+
 @app.get("/api/jobs/{job_id}/export")
 def export_job(job_id: str) -> dict:
     """Everything stored for one job, so a user can take their data with them."""
