@@ -1,0 +1,23 @@
+{
+  "name": "alpine-video",
+  "private": true,
+  "description": "Promo video for Alpine, made with Remotion.",
+  "scripts": {
+    "studio": "remotion studio src/index.js",
+    "render": "remotion render src/index.js AlpinePromo out/alpine-promo.mp4",
+    "render:demo": "remotion render src/index.js AlpineDemo out/alpine-demo.mp4",
+    "record:demo": "node demo/record.mjs"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.540",
+    "@remotion/google-fonts": "^4.0.540",
+    "@remotion/media": "^4.0.540",
+    "@remotion/transitions": "^4.0.540",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "remotion": "^4.0.540"
+  },
+  "devDependencies": {
+    "playwright": "^1.64.1"
+  }
+}

@@ -9,7 +9,8 @@ export default defineConfig({
     rollupOptions: { input: { landing: resolve(import.meta.dirname, 'index.html'), app: resolve(import.meta.dirname, 'app.html') } },
   },
   server: {
-    // One backend serves research, sessions, grading and the voice models.
-    proxy: { '/api': { target: 'http://127.0.0.1:8100', changeOrigin: true } },
+    // One backend serves research, sessions, grading and the voice models. API_PORT points a second
+    // copy of the app at another backend (the demo recording uses 8101).
+    proxy: { '/api': { target: `http://127.0.0.1:${process.env.API_PORT ?? 8100}`, changeOrigin: true } },
   },
 })

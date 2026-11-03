@@ -1,0 +1,97 @@
+{
+  "fps": 30,
+  "fade": 10,
+  "frames": 2570,
+  "segments": [
+    {
+      "kind": "card",
+      "from": null,
+      "to": null,
+      "rate": 1,
+      "frames": 148,
+      "label": "",
+      "caption": "This is Alpine. A mock interview you answer out loud.",
+      "start": 0
+    },
+    {
+      "kind": "video",
+      "from": 1.604,
+      "to": 12.026,
+      "rate": 1.0,
+      "frames": 313,
+      "label": "Alpine",
+      "caption": "It shows you exactly where an answer fell apart, and gives you a better next take.",
+      "start": 138
+    },
+    {
+      "kind": "video",
+      "from": 15.733999999999998,
+      "to": 25.633,
+      "rate": 1.35,
+      "frames": 220,
+      "label": "1 \u00b7 The job",
+      "caption": "Start with the job. Pick a role, add the company, and paste the posting.",
+      "start": 441
+    },
+    {
+      "kind": "video",
+      "from": 25.469,
+      "to": 31.643,
+      "rate": 1.0,
+      "frames": 185,
+      "label": "2 \u00b7 The facts",
+      "caption": "Alpine researches the company. You keep only the facts that are right.",
+      "start": 651
+    },
+    {
+      "kind": "video",
+      "from": 33.385999999999996,
+      "to": 51.660000000000004,
+      "rate": 1.3,
+      "frames": 422,
+      "label": "3 \u00b7 The interview",
+      "caption": "Then the interview starts. Answer by voice, or type. A vague answer gets a follow-up, built from your own words.",
+      "start": 826
+    },
+    {
+      "kind": "video",
+      "from": 51.660000000000004,
+      "to": 87.644,
+      "rate": 2.2,
+      "frames": 491,
+      "label": "3 \u00b7 The interview",
+      "caption": "Specific answers move you on. End the session whenever you are done.",
+      "start": 1238
+    },
+    {
+      "kind": "video",
+      "from": 100.867,
+      "to": 116.66799999999999,
+      "rate": 1.25,
+      "frames": 379,
+      "label": "4 \u00b7 The report",
+      "caption": "Every take is graded on six dimensions. Each score quotes what you said, with one thing to fix. Replay it, or download it as a PDF.",
+      "start": 1719
+    },
+    {
+      "kind": "video",
+      "from": 118.315,
+      "to": 132.66199999999998,
+      "rate": 1.2,
+      "frames": 359,
+      "label": "5 \u00b7 Your climb",
+      "caption": "The overview tracks your progress: scores per take, filler words, and how far you have climbed.",
+      "start": 2088
+    },
+    {
+      "kind": "card",
+      "from": null,
+      "to": null,
+      "rate": 1,
+      "frames": 133,
+      "label": "",
+      "caption": "Alpine. Rehearse the interview. Then just show up.",
+      "start": 2437
+    }
+  ]
+}

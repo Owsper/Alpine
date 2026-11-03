@@ -1,0 +1,9 @@
+node_modules/
+# Renders: only the two finished videos are kept in git
+out/*
+!out/alpine-demo.mp4
+!out/alpine-promo.mp4
+# Rebuilt by the scripts (see README)
+public/*.wav
+public/walkthrough.mp4
+demo/out/

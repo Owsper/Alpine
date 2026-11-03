@@ -142,6 +142,7 @@ Alpine/
 ├── backend/      FastAPI service used by the frontend
 ├── backend-ts/   Separate TypeScript API (Hono, Zod, Supabase), not connected to the frontend yet
 ├── frontend/     React app and landing page
+├── video/        Product demo and promo videos (Remotion) and the scripts that rebuild them
 ├── docs/images/  README images
 └── TODO.md       MVP checklist and status
 ```
@@ -171,6 +172,7 @@ See [TODO.md](TODO.md) for the detailed checklist.
 | --- | --- |
 | [Backend](backend/README.md) | FastAPI routes, settings and code map |
 | [Frontend](frontend/README.md) | Scripts and code layout |
+| [Videos](video/README.md) | Product demo and promo, and how to rebuild them |
 | [TypeScript backend](backend-ts/README.md) | Setup, Supabase, demo mode, evaluation and known limits |
 | [TypeScript API draft](backend-ts/docs/api.md) | Draft API contract |
 | [Frontend wiring guide](backend-ts/docs/frontend.md) | How the frontend maps onto the TypeScript backend |
