@@ -1,0 +1,48 @@
+{
+	"captured_by": "scripts/capture-demo.ts",
+	"company_name": "N26",
+	"company_url": "https://n26.com/",
+	"company_key": "n26.com",
+	"facts": [
+		{
+			"claim": "N26's vision is to change the relationship people have with money for the better.",
+			"source_url": "https://n26.com/en-eu/careers",
+			"retrieved_at": "2026-11-02T14:12:50.471Z"
+		},
+		{
+			"claim": "N26 is a fully licensed German bank with deposit protection up to €100,000.",
+			"source_url": "https://n26.com/en-de",
+			"retrieved_at": "2026-11-02T14:12:49.532Z"
+		},
+		{
+			"claim": "N26 operates in 24 markets worldwide and has over 8 million customers.",
+			"source_url": "https://n26.com/en-de",
+			"retrieved_at": "2026-11-02T14:12:49.532Z"
+		},
+		{
+			"claim": "N26 was founded in Berlin in 2013, pioneering digital banking in Europe.",
+			"source_url": "https://n26.com/en-eu/careers",
+			"retrieved_at": "2026-11-02T14:12:50.471Z"
+		},
+		{
+			"claim": "N26 broke even mid-2024 and reported its first profitable quarter.",
+			"source_url": "https://n26.com/en-eu/careers",
+			"retrieved_at": "2026-11-02T14:12:50.471Z"
+		},
+		{
+			"claim": "N26 has an international team of 1,600 employees from more than 90 nationalities.",
+			"source_url": "https://n26.com/en-eu/careers",
+			"retrieved_at": "2026-11-02T14:12:50.471Z"
+		},
+		{
+			"claim": "N26 is committed to creating a welcoming environment where everyone feels valued and respected.",
+			"source_url": "https://n26.com/en-eu/careers",
+			"retrieved_at": "2026-11-02T14:12:50.471Z"
+		},
+		{
+			"claim": "N26 offers banking, saving, and investing in one app trusted by millions.",
+			"source_url": "https://n26.com/en-de",
+			"retrieved_at": "2026-11-02T14:12:49.532Z"
+		}
+	]
+}

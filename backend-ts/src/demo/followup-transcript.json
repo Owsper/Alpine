@@ -1,0 +1,50 @@
+[
+	{
+		"role": "interviewer",
+		"text": "I am an AI interviewer, not a human. This is practice only, it is not part of any hiring or selection process, and I am not affiliated with any company mentioned. Only the text transcript of this session is saved, no audio is stored."
+	},
+	{
+		"role": "interviewer",
+		"text": "Tell me about a project where you changed how a backend service worked. What was the situation, what did you do yourself and what was the result?"
+	},
+	{
+		"role": "candidate",
+		"text": "Our payments API was timing out at peak hours, about 3 percent of requests failed. I was on call, so I took it on. I traced it to one slow query, added an index and moved the receipts to a queue. After that the failures went down to 0.2 percent and p95 went from 900 to 250 milliseconds."
+	},
+	{
+		"role": "interviewer",
+		"text": "Describe a time you disagreed with a technical decision. What was the situation, what did you do and how did it end?"
+	},
+	{
+		"role": "candidate",
+		"text": "The team wanted to rewrite the ledger service in one big release. I thought that was too risky for customer money, so I wrote a short comparison and proposed moving one endpoint at a time. We agreed on that, and the migration finished in six weeks with no incident."
+	},
+	{
+		"role": "interviewer",
+		"text": "Which result from your recent work can you back with numbers, and how did you measure it?"
+	},
+	{
+		"role": "candidate",
+		"text": "I cut our deployment time from 40 minutes to 12 minutes by splitting the test suite and running it in parallel. We measured it from the CI logs over two months, across about 300 deployments."
+	},
+	{
+		"role": "interviewer",
+		"text": "Tell me about a time you had to fix a serious problem in a system you worked on."
+	},
+	{
+		"role": "candidate",
+		"text": "A retry bug charged about 200 customers twice during an outage. I led the fix. I stopped the job, added an idempotency key to the payment call and wrote the script that refunded everyone within four hours. We have had no double charges since, and I added an alert on duplicate keys."
+	},
+	{
+		"role": "interviewer",
+		"text": "How would you roll out a risky database change without downtime?"
+	},
+	{
+		"role": "candidate",
+		"text": "I would add the new column first, write to both columns behind a flag, backfill in small batches and only then switch the reads. Each step can be rolled back on its own, and I would watch error rates and replication lag while it runs."
+	},
+	{
+		"role": "interviewer",
+		"text": "That was the last question, thanks for practicing. Your feedback will be based only on the text of your answers."
+	}
+]
