@@ -33,9 +33,8 @@ ENV VOICE_ENABLED=true \
     DEMO_MODE=true \
     DATABASE_PATH=/tmp/alpine.db \
     ISOLATE_CLIENTS=true \
-    STATIC_DIR=/home/user/app/static \
-    LLM_BASE_URL=https://relay.crunchman.info/v1
-# LLM_API_KEY comes from the Space's secrets (Settings → Variables and secrets).
+    STATIC_DIR=/home/user/app/static
+# LLM_BASE_URL and LLM_API_KEY come from the Space's secrets (Settings → Variables and secrets).
 
 EXPOSE 7860
 CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "7860"]

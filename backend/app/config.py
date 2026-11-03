@@ -13,7 +13,7 @@ def _flag(name: str, default: str) -> bool:
 
 DATABASE_PATH = os.environ.get("DATABASE_PATH", "interviewverse.db")
 
-LLM_BASE_URL = os.environ.get("LLM_BASE_URL", "https://relay.crunchman.info/v1").rstrip("/")
+LLM_BASE_URL = os.environ.get("LLM_BASE_URL", "").rstrip("/")
 LLM_API_KEY = os.environ.get("LLM_API_KEY", "")
 # Asked in parallel; the first model to return valid JSON wins. The relay's latency spikes per model.
 LLM_MODELS = [m.strip() for m in os.environ.get("LLM_MODELS", "nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B,deepseek-ai/DeepSeek-V4.1-Flash").split(",") if m.strip()]

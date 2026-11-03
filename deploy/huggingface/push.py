@@ -5,7 +5,7 @@ Needs a logged-in Hugging Face CLI (`hf auth login` with a write token). Run fro
     backend/.venv/Scripts/python deploy/huggingface/push.py --space you/name
 
 Only source files are uploaded: no .env, databases, model files, node_modules or builds.
-The LLM key is read from backend/.env and stored as a Space *secret*, never in a file.
+The LLM endpoint and key are read from backend/.env and stored as Space *secrets*, never in a file.
 """
 
 import argparse
@@ -28,9 +28,10 @@ space = args.space or f"{api.whoami()['name']}/alpine"
 api.create_repo(space, repo_type="space", space_sdk="docker", exist_ok=True)
 
 env = dotenv_values(root / "backend" / ".env")
-if not env.get("LLM_API_KEY"):
-    raise SystemExit("backend/.env has no LLM_API_KEY to give the Space.")
-api.add_space_secret(space, "LLM_API_KEY", env["LLM_API_KEY"])
+for name in ("LLM_BASE_URL", "LLM_API_KEY"):
+    if not env.get(name):
+        raise SystemExit(f"backend/.env has no {name} to give the Space.")
+    api.add_space_secret(space, name, env[name])
 if env.get("LLM_MODELS"):
     api.add_space_variable(space, "LLM_MODELS", env["LLM_MODELS"])
 
