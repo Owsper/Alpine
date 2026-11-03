@@ -662,6 +662,47 @@ describe('POST /session/:id/transcript',() => {
 		expect(tries).toBeGreaterThan(1)
 	})
 
+	it.each([11,40])('%i identical partial saves at once all land',async (n) => {
+		const {app,s,store} = await setup()
+		const out = await Promise.all(Array.from({length:n},() => save(app,s.id,turns)))
+		expect(out.map((r) => r.status)).toEqual(Array(n).fill(200))
+		expect(await store.getSession(s.id)).toMatchObject({status:'in_progress',transcript:turns})
+	})
+
+	it('the same partial save again writes nothing and answers with what is stored',async () => {
+		const {app,s,store} = await setup()
+		const first = await save(app,s.id,turns).then((r) => r.json())
+		const write = store.saveTranscript
+		let writes = 0
+		store.saveTranscript = async (...a) => {
+			writes++
+			return write(...a)
+		}
+		expect(await save(app,s.id,turns.map((t) => ({...t,question_id:null}))).then((r) => r.json())).toEqual(first)
+		expect(writes).toBe(0)
+	})
+
+	it('the same turns on a created session still write, the status has to move',async () => {
+		const {app,s,store} = await setup()
+		await store.saveTranscript(s.id,['created'],turns,'created',s.updated_at)
+		expect(await save(app,s.id,turns).then((r) => r.json())).toMatchObject({status:'in_progress',transcript:turns})
+		expect((await store.getSession(s.id))?.status).toBe('in_progress')
+	})
+
+	it('a final save with the same turns still writes, the status has to move',async () => {
+		const {app,s,store} = await setup()
+		await save(app,s.id,turns)
+		expect(await save(app,s.id,turns,true).then((r) => r.json())).toMatchObject({status:'completed',transcript:turns})
+		expect((await store.getSession(s.id))?.status).toBe('completed')
+	})
+
+	it('an empty save on a started session with nothing stored still stores the empty list',async () => {
+		const {app,s,store} = await setup()
+		await post(app,`/session/${s.id}/start`,{})
+		expect(await save(app,s.id,[]).then((r) => r.json())).toMatchObject({status:'in_progress',transcript:[]})
+		expect((await store.getSession(s.id))?.transcript).toEqual([])
+	})
+
 	it('names the stored turns on a frozen session too, and the full resend still works',async () => {
 		const {app,s,store} = await setup()
 		const done = await save(app,s.id,turns,true).then((r) => r.json())

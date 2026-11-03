@@ -223,6 +223,7 @@ export function sessionRoutes(deps:Deps) {
 		if (turns.length > MAX_TURNS || chars > MAX_CHARS) {
 			throw new ApiErr('transcript_too_long',`max ${MAX_TURNS} turns and ${MAX_CHARS} chars`,{turns:turns.length,chars})
 		}
+		const toStatus = final ? 'completed' : 'in_progress'
 		// the write only lands on the version read here, so a save that lost a race reads and checks again
 		for (let i = 0; i < SAVE_TRIES; i++) {
 			const had = await need(id)
@@ -233,9 +234,11 @@ export function sessionRoutes(deps:Deps) {
 				throw new ApiErr('invalid_state',`cannot change the transcript of a session that is ${had.status}`)
 			}
 			if (final && !hasAnswers(turns)) throw new ApiErr('no_candidate_answers','transcript has no candidate answers')
+			// nothing to change, and copies of one save must not use up each other's tries
+			if (had.status === toStatus && had.transcript && sig(had.transcript) === sig(turns)) return c.json(pub(had))
 			const lost = replace ? -1 : lostAnswer(had.transcript,turns)
 			if (lost >= 0) throw new ApiErr('invalid_state',`turn ${lost} changes a stored answer, send replace:true if it is a correction`,{stored_turns:stored,changed_turn:lost})
-			const up = await store.saveTranscript(id,OPEN,turns,final ? 'completed' : 'in_progress',had.updated_at)
+			const up = await store.saveTranscript(id,OPEN,turns,toStatus,had.updated_at)
 			if (up) return c.json(pub(up))
 		}
 		throw new ApiErr('session_conflict','too many saves of this transcript at once, try again')

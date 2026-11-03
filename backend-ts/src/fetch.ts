@@ -5,7 +5,7 @@ import https from 'node:https'
 import {BlockList,isIP,type LookupFunction} from 'node:net'
 import {fileURLToPath} from 'node:url'
 
-export type Fetched = {url:string,html:string,text?:string,retrieved_at:string}
+export type Fetched = {url:string,text:string,retrieved_at:string}
 export type Parsed = {text:string,optOut:boolean}
 export type Addr = {address:string,family:number}
 export type Raw = {status:number,headers:Record<string,string|string[]|undefined>,body:string}
@@ -165,7 +165,8 @@ function inWorker<T>(job:unknown,ms:number,signal?:AbortSignal) {
 
 export const parseHtml = (html:string,ms = PARSE_MS,signal?:AbortSignal) => inWorker<Parsed>(html,ms,signal)
 
-const robotsAllow = async (txt:string,url:string,signal:AbortSignal) => (await inWorker<{allowed:boolean}>({txt,url,ua:UA},PARSE_MS,signal))?.allowed === true
+// null is no answer : our parser died or ran out of time. The page stays unread, but the site said nothing against us
+const robotsAllow = async (txt:string,url:string,signal:AbortSignal) => (await inWorker<{allowed:boolean}>({txt,url,ua:UA},PARSE_MS,signal))?.allowed ?? null
 
 async function follow(start:string,key:string,io:Io,signal:AbortSignal,guard?:(u:URL) => Promise<void>) {
 	let url = start
@@ -207,7 +208,9 @@ export async function safeFetch(url:string,companyKey?:string,o:FetchOpts = {}):
 			if (!robots.has(u.origin)) robots.set(u.origin,loadRobots(u.origin + '/robots.txt',key,io,signal))
 			const txt = await robots.get(u.origin)
 			if (txt === null) throw new Error('robots_unknown')
-			if (txt && !await robotsAllow(txt,u.href,signal)) throw new Error('robots')
+			const allowed = txt ? await robotsAllow(txt,u.href,signal) : true
+			if (allowed === null) throw new Error('robots_unknown')
+			if (!allowed) throw new Error('robots')
 		})
 		if (r.status !== 200) throw new Error('status_' + r.status)
 		if (!/^\s*(text\/html|application\/xhtml\+xml)/i.test(String(r.headers['content-type']))) throw new Error('not_html')
@@ -215,7 +218,7 @@ export async function safeFetch(url:string,companyKey?:string,o:FetchOpts = {}):
 		const parsed = await (o.parse ?? parseHtml)(r.body,PARSE_MS,signal)
 		if (!parsed) throw new Error('unparseable')
 		if (parsed.optOut) throw new Error('tdm_reserved')
-		return {url:r.url,html:r.body,text:parsed.text,retrieved_at:new Date().toISOString()}
+		return {url:r.url,text:parsed.text,retrieved_at:new Date().toISOString()}
 	}
 
 	return Promise.race([run(),timedOut])

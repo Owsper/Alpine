@@ -11,7 +11,7 @@ import {ApiErr,errRes,toApiErr,type Code} from '../src/errors'
 import {checkUrl,type Io,parseHtml,type Raw,safeFetch} from '../src/fetch'
 import {runGrader} from '../src/grade'
 import {createLlm,type LlmCall} from '../src/llm'
-import {pageText,researchRoutes} from '../src/research'
+import {researchRoutes} from '../src/research'
 import {buildFlow,interviewerInstructions} from '../src/session'
 import {memStore} from '../src/store/mem'
 import {pickStore} from '../src/store/pick'
@@ -66,7 +66,7 @@ function researchApp(pages:Record<string,string>,company:() => unknown,facts:(o:
 	const fetchPage = vi.fn(async (url:string) => {
 		const html = pages[url]
 		if (html === undefined) throw new Error('404')
-		return {url,html,retrieved_at:AT}
+		return {url,text:(await parseHtml(html))?.text ?? '',retrieved_at:AT}
 	})
 	const llm = fakeLlm({research_company:company,research_facts:facts})
 	const store = memStore()
@@ -1032,7 +1032,7 @@ describe('security-1 : parsing runs off the main thread',() => {
 	})
 
 	it('deep nesting does not throw',async () => {
-		expect(await pageText('<div>'.repeat(5000) + 'deep words')).toBe('deep words')
+		expect((await parseHtml('<div>'.repeat(5000) + 'deep words'))?.text).toBe('deep words')
 	})
 
 	it('a page over the deadline gives null and the server keeps running',async () => {
@@ -1236,10 +1236,12 @@ describe('supabase store against a stub gateway',() => {
 			res.writeHead(200,json)
 			res.end('[]')
 		})
-		expect(await supabaseStore(envOf(gw.url)).saveTranscript(randomUUID(),['created'],[],'in_progress',AT)).toBeNull()
+		// a version from the future, so the clock alone can not pass this
+		const later = new Date(Date.now() + 3600000).toISOString()
+		expect(await supabaseStore(envOf(gw.url)).saveTranscript(randomUUID(),['created'],[],'in_progress',later)).toBeNull()
 		expect(seen[0].method).toBe('PATCH')
-		expect(seen[0].url.searchParams.get('updated_at')).toBe('eq.' + AT)
-		expect(Date.parse(JSON.parse(seen[0].body).updated_at)).toBeGreaterThan(Date.parse(AT))
+		expect(seen[0].url.searchParams.get('updated_at')).toBe('eq.' + later)
+		expect(Date.parse(JSON.parse(seen[0].body).updated_at)).toBeGreaterThan(Date.parse(later))
 		gw.close()
 	})
 

@@ -1,7 +1,7 @@
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest'
 import {type Io,parseHtml,type Raw,safeFetch} from '../src/fetch'
 
-const hook = vi.hoisted(() => ({script:null as string|null,made:[] as Record<string,unknown>[],sent:[] as unknown[],killed:0}))
+const hook = vi.hoisted(() => ({script:null as string|null,made:[] as Record<string,unknown>[],sent:[] as unknown[],got:[] as any[],killed:0}))
 
 vi.mock('node:child_process',async (orig) => {
 	const m = await orig<typeof import('node:child_process')>()
@@ -9,6 +9,7 @@ vi.mock('node:child_process',async (orig) => {
 		hook.made.push(o as Record<string,unknown>)
 		const c = m.fork(hook.script ?? file,o)
 		const [send,kill] = [c.send.bind(c),c.kill.bind(c)]
+		c.on('message',(m) => hook.got.push(m))
 		c.send = ((job:never) => {
 			hook.sent.push(job)
 			return send(job)
@@ -29,6 +30,7 @@ const BOMB = '<p>' + Array.from({length:1000},(x,i) => `<b a${i}>`).join('') + '
 beforeEach(() => {
 	hook.made.length = 0
 	hook.sent.length = 0
+	hook.got.length = 0
 	hook.killed = 0
 	hook.script = null
 })
@@ -104,6 +106,13 @@ describe('a hostile page at the 3 MB fetch limit',() => {
 		expect(await parseHtml(html)).toBeNull()
 		expect(Date.now() - t0).toBeLessThan(5000)
 		expect((await parseHtml('<p>still working</p>'))?.text).toBe('still working')
+	},30000)
+
+	// cut in the worker : a long answer would be parsed and held by the server, and a slice there keeps the whole string alive
+	it('the worker sends back no more text than the route reads',async () => {
+		const out = await parseHtml(fill('<p>Acme baut Röbots für Händler in ganz Europa.</p>'))
+		expect(out?.text).toHaveLength(12000)
+		expect(hook.got.map((m) => m.text.length)).toEqual([12000])
 	},30000)
 
 	it('an honest page that size parses well inside the hard stop',async () => {
@@ -220,13 +229,23 @@ describe('concurrency-2 : robots rules run off the main thread',() => {
 		expect(gap).toBeLessThan(500)
 	},60000)
 
-	it('rules that take over the hard stop count as disallowed',async () => {
+	it('rules that take over the hard stop leave the page unread, and the site did not say no',async () => {
 		logs()
 		const long = '/' + 'a'.repeat(15000)
 		const {io,asked} = ioFor(long)
-		await expect(safeFetch('https://acme.test/about',undefined,{io})).rejects.toThrow('robots')
+		await expect(safeFetch('https://acme.test/about',undefined,{io})).rejects.toThrow(/^robots_unknown$/)
 		expect(asked).not.toContain(long)
 	},60000)
+
+	it('a robots parser that dies leaves the page unread, and the site did not say no',async () => {
+		logs()
+		// the pool has to be empty for a new worker to be made
+		await Promise.all([0,1,2,3].map(() => parseHtml(HOSTILE,200)))
+		hook.script = new URL('./no-such-worker.mjs',import.meta.url).pathname.replace(/^\/(?=\w:)/,'')
+		const {io,asked} = ioFor('/x')
+		await expect(safeFetch('https://acme.test/about',undefined,{io})).rejects.toThrow(/^robots_unknown$/)
+		expect(asked).toEqual(['/robots.txt'])
+	},30000)
 
 	it('a normal robots.txt still decides',async () => {
 		const io = (txt:string):Io => ({

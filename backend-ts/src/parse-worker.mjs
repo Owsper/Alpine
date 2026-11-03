@@ -7,6 +7,8 @@ const AI_OFF = /\b(noai|notdm)\b/i
 const HIDDEN_STYLE = /(^|;)\s*(display\s*:\s*none|visibility\s*:\s*hidden)\b/i
 // react streaming renders a page into <div hidden id="S:0"> and its script moves that into place, so the reader does see it
 const STREAMED = /^S:[0-9a-f]+$/i
+// the route reads no further. Cut here : a long answer would be parsed and held by the server, and a slice there keeps the whole string alive
+const PAGE_CHARS = 12000
 
 const hidden = ({attribs:a}) => a && ((a.hidden !== undefined && !STREAMED.test(a.id ?? '')) || a['aria-hidden']?.trim().toLowerCase() === 'true' || HIDDEN_STYLE.test(a.style ?? ''))
 
@@ -41,5 +43,5 @@ process.on('message',(job) => {
 		return process.send({allowed:bot.isAllowed(job.url,job.ua) === true})
 	}
 	const $ = cheerio.load(job)
-	process.send({text:textOf($('body')[0]),optOut:optedOut($)})
+	process.send({text:textOf($('body')[0]).slice(0,PAGE_CHARS),optOut:optedOut($)})
 })

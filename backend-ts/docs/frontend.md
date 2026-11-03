@@ -1,266 +1,282 @@
 # Frontend integration
 
-> **DRAFT for sign-off.** Calls and fields are the real ones from [api.md](api.md). Recommendations are proposals, the frontend team decides. Frontend line numbers are from commit `b2ddd74` and will drift.
+> **DRAFT for sign-off. Nothing here is wired.** The frontend on `main` (`frontend/`, commit `c96c683`) calls the FastAPI backend in `backend/`, not this one. This doc is the map for pointing it at backend-ts if the team picks backend-ts. It does not pick a backend, and where a recommendation depends on which one wins, it says so.
 
-The frontend is fully mocked today : `src/data.js` says so on line 1, and `src/` has no `fetch`, `WebSocket` or `RTCPeerConnection`. So nothing below is wired yet.
+Paths like `screens/Report.jsx:52` are relative to `frontend/src/`. All frontend and `backend/` line numbers are from `c96c683` and will drift.
 
-Sign-off means three things : answer the [decisions](#decisions-needed) by number, pick a [voice option](#the-biggest-gap--voice-and-transcripts), and close the [open points in api.md](api.md#open-points-for-sign-off).
+Sign-off means two things : answer the [decisions](#decisions-needed) by number, and close the [open points in api.md](api.md#open-points-for-sign-off). The voice on `main` answers points 1 to 3 there : no voice token, one Turn per utterance with its question id, one save at the end. Points 4 to 6 are still open.
+
+## Before any screen works
+
+**Path and port.** The frontend puts `/api` in front of everything (`api.js:7`, `voice/backendClient.ts:33,39`, `voice/config.ts:5-8`) and Vite sends it to port 8100 (`frontend/vite.config.js:8`). backend-ts has no prefix and listens on 8787. The proxy can bridge that with no backend change. The first key is only for [voice option A](#voice) and has to stay first :
+
+```js
+proxy:{
+	'/api/voice':{target:'http://127.0.0.1:8100',changeOrigin:true},
+	'/api':{target:'http://127.0.0.1:8787',changeOrigin:true,rewrite:(p) => p.replace(/^\/api/,'')},
+},
+```
+
+Requests stay same origin, so `CORS_ORIGIN` plays no part under `vite` or `vite preview`. A deployed build has no Vite, so whatever serves it needs the same rewrite, plus `TRUST_PROXY` so rate limits see real clients.
+
+**`user_id`.** Neither client sends one, and `/research` and `/session` require it. See [D5](#d5-where-the-ids-live).
+
+## Every call
+
+| Frontend call | Sends today | backend-ts | What differs, and what it reads |
+| --- | --- | --- | --- |
+| `api.research`, `api.js:33`, `screens/Research.jsx:46` | `POST /api/research` `{company,role,description}` | `POST /research` `{user_id,job_description,company_url?}` | As sent : `bad_request`. `description` is `job_description`, `user_id` is required, `company` and `role` have no field, see [D8](#d8-company-role-and-a-url-as-the-posting). Reads `job.id` and `facts`, same names, except `source_label` |
+| `api.session`, `api.js:34`, `screens/Interview.jsx:125` | `POST /api/session` `{job_id}` | `POST /session` `{user_id,job_id}` | As sent : `bad_request`. Reads `sessionId`, which is `id`, and `company`, `role`, `facts`, which a Session does not have. Always makes a new session, see [round 2](#one-full-loop) |
+| `api.start`, `api.js:35`, `screens/Interview.jsx:126` | `POST /api/session/{id}/start` | `POST /session/:id/start` | Same call, no body, response not read. Gets `invalid_state` on a completed or graded session, FastAPI answers 200 (`backend/app/main.py:173-175`) |
+| `api.grade`, `api.js:23,36`, `screens/Report.jsx:52` | `POST /api/grade` `{session_id}` | `POST /grade` `{session_id}` | Same request, other response names, see [Score](#field-map). A second call while one runs gets `grading_in_progress`, FastAPI waits on a lock (`backend/app/main.py:195`) |
+| `api.next`, `api.js:37`, `screens/Report.jsx:69` | `POST /api/next` `{session_id}` | `POST /next` `{session_id}` | Same request. Reads `session.sessionId`, which is `session.id`. `plan` has other names, nothing reads it |
+| `api.progress`, `api.js:38`, `screens/Progress.jsx:38` | `GET /api/progress/{job}` | **No equivalent** | Gets `not_found`, and `screens/Progress.jsx:40` turns any failure into demo numbers with no error, so a backend problem reads as sample data. Use `GET /session/:gradedSessionId`, see [Progress](#field-map) |
+| `api.voiceStatus`, `api.js:39` | `GET /api/voice/status` | **No equivalent** | Nothing calls it |
+| `loadSession`, `voice/backendClient.ts:32` | `GET /api/session/{id}` | `GET /session/:id` | Nothing calls it. The response is `{session,score,job,facts,disclaimer}`, not a flat session |
+| `sendTranscript`, `voice/backendClient.ts:38`, `voice/interviewFlow.ts:208` | `POST /api/session/{id}/transcript` `{turns:[{questionId,role,text,startedAt,endedAt}],durationSec}` | `POST /session/:id/transcript` `{turns:[{role,text,question_id}],final:true}` | As sent : `bad_request`, the schema is strict and `final` is required, see [Transcript](#field-map). Response not read |
+| `transcribe`, `voice/localVoice.ts:15` | `POST /api/voice/asr`, WAV | **No equivalent** | See [Voice](#voice) |
+| `streamChat`, `voice/localVoice.ts:24` | `POST /api/voice/chat`, reads SSE | **No equivalent** | See [Voice](#voice) |
+| `synthesize`, `voice/localVoice.ts:51` | `POST /api/voice/tts`, reads WAV | **No equivalent** | See [Voice](#voice) |
+| `config.api.health`, `voice/config.ts:8` | `GET /api/health` | `GET /health` | Nothing calls it. `{ok,store,model,demo}`, not `{ok,demo_mode,models,dimensions}` |
+
+Ids : every backend-ts id is a uuid and anything else gets `bad_request`, so the default session id `practice` (`voice/config.ts:48`) can't be used. FastAPI's question ids are `q1` to `q5` (`backend/app/questions.py:63`). The client passes them through without reading them, so uuids work.
 
 ## One full loop
 
-| # | Screen | When | Call | Keep |
+| # | Screen | When | backend-ts call | Keep in flow state |
 | --- | --- | --- | --- | --- |
-| 1 | `/start` JobPosting | "Prepare interview" | `POST /research` `{user_id,job_description,company_url?}` | `job.id`, `company`, `facts`, `warnings`, `disclaimer` |
-| 2 | `/research` Research | "Start interview" | `POST /session` `{user_id,job_id}` | the Session : `id`, `number`, `flow` |
-| 3 | `/interview` Interview | lobby "Start interview" | `POST /session/:id/start`, no body | |
-| 4 | | after each answer | `POST /session/:id/transcript` `{turns,final:false}` | all turns so far, one save at a time |
-| 5 | | "End session" | `POST /session/:id/transcript` `{turns,final:true}` | `transcript`, for "View transcript" |
-| 6 | `/report` Report | on arrival | `POST /grade` `{session_id}` | the Score |
-| 7 | | "Generate my next interview" | `POST /next` `{session_id}` | `session`, now the current one |
-| 8 | `/progress` Progress | on arrival | none, uses the Score from 6 | |
-| 9 | | "Start next interview" | none, back to 3 with the session from 7 | |
+| 1 | `/start` | "Prepare interview", `screens/JobPosting.jsx:59-72` | none | `job` |
+| 2 | `/research` | on arrival, in an effect, `screens/Research.jsx:42-57` | `POST /research` | `job.id` as `jobId`, `facts`, and `warnings`, which nothing reads yet |
+| 3 | `/interview` | lobby "Start interview", `screens/Interview.jsx:117-130` | `POST /session`, or `GET /session/:id` on round 2, then `POST /session/:id/start` | `id` as `sessionId` |
+| 4 | | while talking, `screens/Interview.jsx:160-187`, `voice/interviewFlow.ts:72,247` | none, see [Voice](#voice) | |
+| 5 | | last answer or "End session", `screens/Interview.jsx:215-221`, `voice/interviewFlow.ts:200-214` | `POST /session/:id/transcript` with `final:true`, once | |
+| 6 | `/report` | on arrival, in an effect, `screens/Report.jsx:45-59` | `POST /grade` | the Score, in the screen |
+| 7 | | "Generate my next interview", `screens/Report.jsx:61-77` | `POST /next` | `session.id` as `sessionId`, the graded one as `gradedSessionId` |
+| 8 | `/progress` | on arrival, in an effect, `screens/Progress.jsx:36-42` | `GET /session/:gradedSessionId` | |
+| 9 | | "Start next interview", `screens/Progress.jsx:183` | none, back to 3 | |
 
-The landing page calls nothing. On the second pass the Score from step 6 has `progress` filled, on the first pass it is null, which matches the `comparing` branch in `Progress.jsx`. Drive that branch from `score.progress !== null`, see the [field map](#field-map).
+The landing page calls nothing.
 
-- **Click handlers, not effects.** `main.jsx:17` uses `StrictMode`, which runs effects twice in dev. `/research` and `/session` are not idempotent, so an effect makes two jobs and pays the LLM twice. Step 6 has to run on arrival, so guard it with a ref : a second `/grade` at the same time gets `grading_in_progress`.
-- **Going back.** `/start` stays reachable. Call `/research` again only if the text changed, every call makes a new job.
-- **Reload.** `session_id` is enough, `GET /session/:id` returns the session, score, job, facts and disclaimer. `created` or `in_progress` means Interview, `completed` means Report and run step 6, `graded` means Report with the returned `score`. After step 7 the graded session is `session.source_session_id`.
-- **Reload, id is gone.** On `not_found` for a stored `session_id` or `job_id`, clear `job_id` and `session_id` from the flow state, keep `user_id`, and go back to `/start`. A restart of a server on the memory store causes this, it loses everything, and demo mode always uses that store.
-- **Reload during an interview.** The turns are in memory, so they are gone after a refresh and `flow.jsx` keeps the interview going. Before any save, seed the turns from `session.transcript` (null means `[]`) and resume at the first `flow` step of type `question` whose `question_id` has no candidate turn. Never start from an empty list : a shorter save and End session both get `invalid_state` with `details.stored_turns`, and so does a list that reaches the stored length with different answers, with `details.changed_turn` as well. Reload on those, do not resend with `replace:true`. That flag is only for a screen where the user corrects an answer.
-- **Waits**, from a few runs : `/research` 4 to 23 s, `/session` 13 to 23 s, `/grade` 17 to 69 s, `/next` 19 to 40 s. Details in [api.md](api.md#timing).
+- **Round 2.** `screens/Interview.jsx:125` calls `api.session` on every start. FastAPI hands back the session `/next` planned (`backend/app/main.py:156`). backend-ts makes a new one : in a run it returned number 3 next to the planned number 2, with `source_session_id` null, so the planned questions are lost and `/grade` returns `progress:null`. So when `sessionId` is set, read it with `GET /session/:id` and reuse it while `status` is `created` or `in_progress`. Otherwise `POST /session`.
+- **`/research` in an effect.** `main.jsx:17` uses `StrictMode`, which runs effects twice in dev, and `cancelled` (`screens/Research.jsx:44,48`) only ignores the answer. So in dev each research makes two jobs, on both backends. On backend-ts both spend LLM calls and count against the limit of 10 per minute. Share the call in flight, the way `api.js:22-30` does for grade.
+- **Back on `/report` after step 7.** `sessionId` is already the new ungraded session, so `screens/Report.jsx:52` gets an error on both backends. `gradedSessionId` is set (`screens/Report.jsx:70`) and nothing reads it. Use it here and on Progress.
+- **Reload.** Flow state survives in `sessionStorage`, and `/grade` returns the stored score. During an interview the turns are in memory only (`voice/transcript.ts:1`), so a reload goes back to the lobby and the answers are gone, on both backends. backend-ts takes `final:false` saves if the team wants more, see [the route](api.md#post-sessionidtranscript).
+- **Stored id is gone, backend-ts only.** A restart on the memory store loses every id, and demo mode always uses that store. On `not_found` for a stored id, clear `jobId` and `sessionId`, keep `user_id`, and go back to `/start`.
+- **Waits**, from a few runs : `/research` 4 to 30 s, `/session` 13 to 23 s, `/grade` 17 to 69 s, `/next` 19 to 40 s. Details in [api.md](api.md#timing). FastAPI picks session and next questions from a bank with no LLM, so "Preparing…" (`screens/Interview.jsx:297`) and "Planning…" (`screens/Report.jsx:163`) will show much longer.
 
 ## Field map
 
-Job form :
+Facts, read in `api.js:47-55` :
 
-| Frontend | API |
+| Frontend reads | backend-ts |
 | --- | --- |
-| `job.posting` | `job_description`, 1 to 20000 chars |
-| `job.company`, `job.role` | no request field, unknown fields are dropped silently, see [D8](#d8-company-role-and-a-url-as-the-posting) |
-| nothing | `company_url`, optional |
-| shown back | `job.company_name`, `job.role_title`, `company.name`, all nullable |
+| `fact.claim` | same, a sentence copied from the page, so it can say "we" |
+| `fact.source_url` | same, always a full http(s) url, so the "job posting you pasted" branch (`api.js:53`) never runs |
+| `fact.retrieved_at` | same, ISO |
+| `fact.source_label`, as `tag` | none, the backend does not categorize. `screens/Research.jsx:164` would show an empty tag. Drop it, or show the source host there |
+| nothing | `company`, `warnings`, `cached`, `disclaimer`, see [D9](#d9-no-facts-found) and [D12](#d12-missing-from-the-ui) |
 
-Facts :
+Session :
 
-| Frontend | API |
+| Frontend reads | backend-ts |
 | --- | --- |
-| `fact.text` | `claim`, a sentence copied from the page, so it can say "we" |
-| `fact.source` | `source_url`, a full url, so drop the `https://` prefix in `Research.jsx:155` |
-| `fact.retrieved` | `retrieved_at`, ISO. `new Date(x).toLocaleDateString('en-GB',{dateStyle:'medium'})` gives `2 Nov 2026` |
-| `fact.id` | none, use the array index |
-| `fact.tag` | none, the backend does not categorize. Drop it, or show the source host there |
-| `fact.added`, `isEdited` | none, see [D1](#d1-editable-facts) |
-| `company` constant | `company.name`, can be null |
+| `sessionId`, `screens/Interview.jsx:126,130`, `screens/Report.jsx:70`, `voice/interviewFlow.ts:208` | `id` |
+| `number`, `screens/Interview.jsx:368` | same |
+| `questions[].id`, `.text`, `screens/Interview.jsx:57`, `voice/interviewFlow.ts:69,89,112` | same, in the same order as `flow`. `kind` can also be `base`, nothing reads it |
+| `company`, `role`, `voice/interviewFlow.ts:63,228` | not on a Session. Use `job.company` and `job.role` from the form (`flow.jsx:53`), they are required there. `job.company_name` and `job.role_title` from the API can be null. Unmapped, the intro says "the undefined role at undefined" |
+| `facts`, `voice/interviewFlow.ts:223` | not needed, `screens/Interview.jsx:128` fills it from the Research list |
+| nothing | `flow`, `interviewer_instructions`, see [D15](#d15-what-the-interviewer-says-first) and [Voice](#voice) |
 
-Interview :
+Transcript, built in `voice/interviewFlow.ts:97,141` :
 
-| Frontend | API |
+| Frontend sends | backend-ts |
 | --- | --- |
-| `generateQuestions(facts)` | `session.flow`, steps with `type` `question`. Use `flow`, not `questions`, for the order |
-| `question` as React key | `question_id` |
-| `currentQuestion.index` | none, client state moved by whatever runs the voice |
-| `interviewStartedAt`, `interviewer` | none, client only |
+| `role`, `text` | same |
+| `questionId` | `question_id`, a uuid or null. The intro is saved under the first question's id (`voice/interviewFlow.ts:89`), which is accepted |
+| `startedAt`, `endedAt`, `durationSec` | no field, rejected |
+| nothing | `final:true`, required |
 
-Dimensions, same order as `score.scores` :
+```js
+{turns:t.turns.map(({role,text,questionId}) => ({role,text,question_id:questionId})),final:true}
+```
 
-| Frontend name | Id |
+Dimensions, same order on both (`backend/app/config.py:36`, `src/contracts.ts`) :
+
+| FastAPI name | Label, `api.js:43-44` | backend-ts id |
+| --- | --- | --- |
+| `STAR` | STAR structure | `star` |
+| `Relevance` | Relevance | `relevance` |
+| `Role knowledge` | Role knowledge | `role_knowledge` |
+| `Company fit` | Company fit | `company_fit` |
+| `Conciseness` | Conciseness | `conciseness` |
+| `Evidence` | Evidence | `evidence` |
+
+`label()` only knows `STAR`, so the ids print raw until `DIMENSION_LABELS` has all six.
+
+Score, in `screens/Report.jsx` :
+
+| Frontend reads | backend-ts |
 | --- | --- |
-| STAR structure | `star` |
-| Relevance | `relevance` |
-| Role knowledge | `role_knowledge` |
-| Company fit | `company_fit` |
-| Conciseness | `conciseness` |
-| Evidence | `evidence` |
+| `s.value`, `:99-101,131,154` | `score`, 1 to 5, never null |
+| `s.fix`, `:138,143` | `tip`, on all six |
+| `s.evidence_quote`, `:133-135,156` | same, never null |
+| `report.overall`, `:113` | none, so it prints `0.0 / 5`, see [D3](#d3-overall-score) |
+| `report.top_strengths`, `:116` | `strengths`, one or more, not sorted by score. Unmapped, this line throws |
+| `report.top_weaknesses`, `:117` | `weakest`, exactly two, lowest first |
 
-Results :
+Progress, in `screens/Progress.jsx`, from `GET /session/:gradedSessionId` :
 
-| Frontend | API |
+| Frontend reads | backend-ts |
 | --- | --- |
-| `Math.max(1,interviewsCompleted)` | the graded session's `number`, counts per job. Keep it from before step 7 or read it with `GET /session/:source_session_id`. On `/progress` the current session is already the new one, so `session.number` is one too high |
-| `comparing`, `latest > 1` on Progress | `score.progress !== null`, never `session.number`. On the first pass `session.number` is 2 while `progress` is null, so `score.progress[i]` would throw |
-| `dimensions[i].sessionN` on Report | `score.scores[i].score` |
-| `sessionResults[i].strongest`, one string | `score.strengths`, one or more, not sorted by score |
-| `sessionResults[i].focus`, `'STAR, Evidence'` | `score.weakest`, exactly two, lowest first |
-| hard-coded quote and tip, `Report.jsx:59-73` | `score.scores[i].evidence_quote`, `.tip`, one per dimension |
-| `d.session1`, `d.session2` on Progress | when comparing `score.progress[i].prev`, `.cur`. On the first pass `d.session1` is `score.scores[i].score` and there is no `d.session2` |
-| `delta` | `score.progress[i].delta`, only when `.significant` is true |
-| `averageScore()` | none on purpose, see [D3](#d3-overall-score) |
-| hard-coded "Demo data", `Research.jsx:120`, `reportPdf.js:100` | `job.demo`, `score.fallback` |
+| `sessions.length > 1`, `:53` | `score.progress !== null` |
+| `last.number`, `:54` | `session.number` |
+| `before.number`, `:55` | `session.number` from `GET /session/:source_session_id` |
+| `session1`, `session2`, `:51` | when comparing `score.progress[i].prev`, `.cur`. On the first pass only `score.scores[i].score` |
+| `delta`, `:159,173` | `score.progress[i].delta`, see [D4](#d4-progress-claims) |
+
+The screen only reads the last two sessions (`:46-47`), so `score.progress` covers it. For a longer history `GET /user/:id/export` works : filter `sessions` by `job_id` and `status`, join `scores` on `session_id`. It also carries every transcript, and there is no list route.
 
 ## Decisions needed
 
+Numbers are kept from the earlier draft. D10 and D14 are gone because the frontend settled them : the "AI interviewer" pill stays in both layouts (`screens/Interview.jsx:307-311`), the scan holds until research answers (`screens/Research.jsx:26-39`), End session waits for the save (`screens/Interview.jsx:216,360`), and "Generate my next interview" waits for `/next` (`screens/Report.jsx:61-77`).
+
 ### D1. Editable facts
 
-Research lets the user edit, remove and add facts (`Research.jsx:69-85`), and added ones have no source. The backend has no route that changes facts and a Fact must have `source_url` and `retrieved_at`. `/session` builds `interviewer_instructions` from the stored facts and `/grade` and `/next` read them too, so edits would reach none of them. "The interviewer only uses what is listed here" (`Research.jsx:91`) would be false, and added facts break "Every fact links to its source" on the same line and "Never show a fact without a source" in the requirements.
+Research lets the user edit, remove and add facts (`screens/Research.jsx:84-110`), and added ones have no source (`:186`). `screens/Interview.jsx:127-128` passes that list to the flow, where only the follow-up prompt reads it (`voice/interviewFlow.ts:223,237`).
 
-**Recommend** : read-only facts for the MVP, remove the edit UI. If removing a fact matters later it needs a new backend route, none exists. Text the user types should never be shown as a fact.
+On backend-ts no route changes facts. `/session` writes the questions from the stored facts, and `/grade` and `/next` read them too, so a removed fact still shapes the interview and "The interviewer only uses what is listed here" (`screens/Research.jsx:116`) is false. On FastAPI that line holds, because its questions and grader do not read facts. Under both, added facts break "Every fact links to its source" on the same line and "Never show a fact without a source" in the requirements.
 
-### D2. generateQuestions versus server questions
+**Recommend** : under both, drop "Add fact", text the user types should never be shown as a fact. On backend-ts also make facts read-only for the MVP, or reword that line.
 
-`generateQuestions(facts)` returns short labels and a changing count (`data.js:61`). The server returns exactly 5 full questions, up to two sentences each, so the list needs room for longer text. The Blueprint panel also invents 5 questions from a skills regex under the heading "Your interview" (`Blueprint.jsx:19-25`), and the real ones will differ.
+### D2. Placeholder questions
 
-**Recommend** : delete `generateQuestions`, render `session.flow`. Keep the Blueprint skills, drop its question list or label it as an example.
+Until a session exists the list shows `generateQuestions(facts)` (`screens/Interview.jsx:57`, `data.js:61`). The Blueprint panel invents 5 questions from a skills regex under "Your interview" (`components/Blueprint.jsx:19-25,30`). The real ones differ on both backends.
+
+**Recommend** : under both, no list before the session exists, and delete `generateQuestions`. Keep the Blueprint skills, drop its question list or label it as an example.
 
 ### D3. Overall score
 
-Report shows "Overall score x.x / 5" (`Report.jsx:37-40`). Progress shows averages and a "Change" (`Progress.jsx:36-37,90-99`), and so do the PDF and the saved positions (`Progress.jsx:48-49,65-71`). The research, section 9 Ethics, says : "Psychological safety: the pattern "1 strength → 2 improvements → 1 exercise"; no overall score after the first session." That wording can mean none from session 2 on, or none once session 1 ends. The backend has no such field, and [api.md](api.md#what-the-frontend-owns) says the UI must not compute one.
+Report shows "Overall score" (`screens/Report.jsx:110-115`). Progress shows averages and a "Change" (`screens/Progress.jsx:56-58,115-121`), and so do the PDF and the saved positions (`:67-71,89-95`). The research, section 9 Ethics, says : "Psychological safety: the pattern "1 strength → 2 improvements → 1 exercise"; no overall score after the first session." That wording can mean none from session 2 on, or none once session 1 ends. FastAPI returns `overall` (`backend/app/grader.py:112`). backend-ts has no such field, and [api.md](api.md#what-the-frontend-owns) says the UI must not compute one.
 
-**Recommend** : no overall score on any session, which holds under both readings. Delete `averageScore`. The research demo script is per dimension too : "radar: Structure 2 → 4".
+**Recommend** : no overall score on any session, which holds under both readings. On backend-ts this is required anyway. On FastAPI it means not showing a field it sends.
 
 ### D4. Progress claims
 
-The research, section 7 : "Progress = Δ on repeated dimensions, shown only if Δ > grader noise". Today every delta is shown (`Progress.jsx:148`), the lede says "improved" (`:86`), confetti always plays when comparing (`:97`), and "Change" always gets a `+` (`:96`), so a drop would read `+-0.5`.
+The research, section 7 : "Progress = Δ on repeated dimensions, shown only if Δ > grader noise". Today every delta is shown (`screens/Progress.jsx:173`), the lede says "improved" (`:111`), confetti always plays when comparing (`:122`), and "Change" always gets a `+` (`:93,121`), so a drop would read `+-0.5`.
 
-**Recommend** : show `delta` only when `significant`, otherwise "within noise". Confetti only when a row has `significant` and `delta > 0`. Neutral lede. Render real drops. `progress` compares a session with the one before it only, so a longer history needs stored session ids or `GET /user/:id/export`, there is no list route.
+**Recommend** : under both, confetti only on a real gain, a neutral lede, and real drops rendered. On backend-ts show `delta` only when `significant`, otherwise "within noise". FastAPI has no such flag : it returns `runs` per dimension (`backend/app/main.py:95`), and something would have to compute the rule from them.
 
 ### D5. Where the ids live
 
-Flow state is in `sessionStorage`, one per tab (`flow.jsx:33,44`). Finished positions are in `localStorage` and nothing reads them yet (`flow.jsx:13,23`).
+Settled : `jobId`, `sessionId` and `gradedSessionId` are in flow state (`flow.jsx:6,68-71`), in `sessionStorage`, one per tab (`flow.jsx:33,44`), and routes carry no ids (`App.jsx:58-62`). Keep them out of urls, analytics and logs, because anyone holding an id can read or change that data, see [api.md](api.md#anonymous-user_id).
 
-**Recommend** :
+**Recommend, backend-ts only**, FastAPI has no users :
 
-- `user_id` in `localStorage`, created once. In `sessionStorage` every tab would be a new user with unreachable data.
-- Current `job_id` and `session_id` in the flow state, so a refresh restores through `GET /session/:id`.
-- `interviewverse-positions` keeps `job_id` and session ids, not copies of the job, facts and results.
-- Never in a url, analytics or logs. Routes have no ids today, so keep it that way, because anyone holding an id can read or change that data, see [api.md](api.md#anonymous-user_id).
+- `user_id` in `localStorage`, created once. In flow state every tab would be a new user with unreachable data.
+- `interviewverse-positions` (`flow.jsx:76`) keeps `job_id` and session ids, not copies of the job, facts and results. Nothing reads it yet (`flow.jsx:13,23`).
 - `DELETE /user/:id` only clears the server. The frontend must also clear `user_id`, `interviewverse-flow`, `interviewverse-positions` and `interviewverse-positions-backup-*`, which hold the pasted job posting.
 
-### D6. Opened from disk, origin null
+### D6. Opened from disk
 
-`npm run build:file` makes `dist/standalone.html`, opened from disk with `HashRouter` (`main.jsx:14`). Its requests carry `Origin: null`. The server allows exactly one origin, `http://localhost:5173` by default, so the browser blocks them and `fetch` throws with no error envelope. `vite preview` (port 4173 by default) and `http://127.0.0.1:5173` are refused the same way.
+`npm run build:file` (`frontend/package.json:9`) makes `dist/standalone.html`, opened from disk with `HashRouter` (`main.jsx:14`). `api.js:7` fetches a relative `/api`, and on `file:` there is no server behind that, so neither backend can be reached. Research shows an error next to the mock facts (`screens/Research.jsx:145-156`), and the lobby stops at "Research the job first" (`screens/Interview.jsx:118-120`).
 
-**Recommend** : use the Vite dev server or `npm run preview -- --port 5173` for anything that talks to the API, and keep the standalone file as a mock demo only, labeled as such. `CORS_ORIGIN=null` does make the server accept it, but then the Vite origin is refused, and any local file or sandboxed iframe in that browser can call the server and spend LLM calls. Use it only for a one machine demo, if at all. If you add a Vite proxy, give it a prefix like `/api`, because `/research` is both a page and an API route.
+**Recommend** : under both, remove that build or label it as a mock that stops at the lobby.
 
 ### D7. Camera
 
-The preview is local today : `getUserMedia({video:true,audio:false})` goes only to the `<video>` element and the tracks stop on toggle or leave (`Interview.jsx:68-94`). It has to stay that way. With any voice option, request audio separately and send only that, never add the camera stream to a network connection or draw frames from it. No API field can carry it, the Turn schema rejects unknown fields.
+Settled : the preview is off by default and stays local (`screens/Interview.jsx:34,81-102`), and the microphone is its own stream (`voice/audio.ts:55-56`).
 
-The research, section 7, says "the camera is not used", while the landing page calls it "an optional mirror" (`Landing.jsx:193`), and the lobby says "Check your camera and mic" (`Interview.jsx:175`).
+Still open : the research, section 7, says "the camera is not used", while the landing page calls it "an optional mirror" (`screens/Landing.jsx:193`).
 
-**Recommend** : keep it off by default as it is now, say "stays on this device" next to the button, and reword the lobby so it does not read as required. Someone should confirm that the mirror is acceptable against the research line.
+**Recommend** : under both, say "stays on this device" next to the button. Someone should confirm that the mirror is acceptable against the research line.
 
 ### D8. Company, role and a url as the posting
 
-The form requires company and role (`JobPosting.jsx:9-13`), but `/research` only takes `job_description` and drops unknown fields without an error. The LLM reads the company and role out of the text, and the demo posting names neither. The form also offers "the posting text or a URL" (`JobPosting.jsx:12,147`), but the backend never reads a posting from a url : a url in the text only counts as a candidate for the company site, and job board hosts never do.
+**backend-ts only.** The form requires company and role (`screens/JobPosting.jsx:9-13`) and FastAPI takes them (`backend/app/models.py:8-9`), but `/research` only takes `job_description` and reads them out of the text with the LLM. The demo posting names neither. The form also offers "the posting text or a URL" (`screens/JobPosting.jsx:12,147`), but backend-ts never reads a posting from a url : a url in the text only counts as a candidate for the company site.
 
-**Required** : cap the textarea so the whole text stays under 20000 chars. A longer text gets `bad_request`, and a paste far over the 256 KB body limit can fail as a bare `TypeError` with no error envelope, see the [fetch helper](#fetch-helper).
+**Required** : cap the textarea so the whole text stays under 20000 chars, a longer text gets `bad_request`. FastAPI cuts at 12000 without saying so (`backend/app/main.py:137`).
 
-**Recommend** : send `` `${role} at ${company}\n\n${posting}` `` as `job_description`, change the copy to text only, and add an optional company website field for `company_url`, since that is the only sure way to get the right site. Omit `company_url` when the field is blank and add `https://` when no scheme was typed : `''`, `acme.test` and `www.acme.test` get a plain `bad_request`, so the "ask for another url" handling of `source_not_allowed` never runs for them.
+**Recommend** : send `` `${role} at ${company}\n\n${posting}` `` as `job_description`, change the copy to text only, and add an optional company website field for `company_url`, since that is the only sure way to get the right site. Omit it when blank and add `https://` when no scheme was typed : `''` and `acme.test` get a plain `bad_request`.
 
 ### D9. No facts found
 
-The UI refuses to start without a fact and asks the user to write one (`Research.jsx:176-198`, `flow.jsx:66`). `/research` can return 200 with `facts:[]` and a warning, `no_official_source` or `no_sourced_facts`, and the job is usable. `source_refused` comes on top of one of those when the company's site said no to us (robots.txt, 403, 429 or an AI opt-out) and nothing of it was read. [api.md](api.md#what-the-frontend-owns) says to show the warning and not fill the gap.
+The UI refuses to start without a fact and asks the user to write one (`screens/Research.jsx:214-236`, `flow.jsx:66`), and the initial list is the mock (`flow.jsx:6`). Both backends can return `facts:[]`. backend-ts also sends a warning, `no_official_source` or `no_sourced_facts`, with `source_refused` on top when the company's site said no. The job is usable, and [api.md](api.md#what-the-frontend-owns) says to show the warning and not fill the gap.
 
-**Recommend** : allow the start with no facts and show the warning. Check `source_refused` first and say the company's site does not allow automated reading, because "no official source" reads as if the company has no site. `INITIAL.facts` starts empty, not from the mock (`flow.jsx:6`).
-
-### D10. AI badge disappears
-
-The pill says "AI interviewer" only while the interviewer is the main tile. After a swap it says "You" and the small tile says "Interviewer" (`Interview.jsx:149,184-195`). [api.md](api.md#what-the-frontend-owns) asks for a visible badge for the whole interview, for EU AI Act Art. 50.
-
-**Recommend** : one fixed badge in both layouts.
+**Recommend** : under both, allow the start with no facts and let `INITIAL.facts` start empty. On backend-ts show the warning, and check `source_refused` first, because "no official source" reads as if the company has no site.
 
 ### D11. Report content
 
-The feedback panel is one hard-coded Evidence card (`Report.jsx:52-75`), and the API returns a quote and tip for all six. "Strongest area" expects one value, while `strengths` can hold several and is not sorted by score, so `strengths[0]` is not always the strongest.
+The weakest dimension gets a quote and tip, the other five a quote only (`screens/Report.jsx:126-159`). "Strongest area" (`:116`) reads as one value. On backend-ts `tip` is on all six, and `strengths` can hold several and is not sorted by score, so `strengths[0]` is not always the strongest.
 
-**Recommend** : follow the research pattern, strengths first, then the two `weakest` with quote and tip, with all six reachable. Relabel to "Strengths". When `fallback` is true, label it as sample feedback. If `company_name` is passed to the PDF, handle null, `company.normalize` throws on it (`reportPdf.js:151`).
+**Recommend** : under both, follow the research pattern, strengths first, then the two weakest with quote and tip, with all six reachable. Relabel to "Strengths". On backend-ts, when `fallback` is true, label it as sample feedback.
 
 ### D12. Missing from the UI
 
-No screen has the `disclaimer`, the `warnings`, or export and delete. The research asks for "One-click data deletion; report export for a coach".
+No screen has a disclaimer, warnings, or export and delete. The research asks for "One-click data deletion; report export for a coach".
 
-**Recommend** : show `disclaimer` on Research and Report, and add a "Your data" entry using `GET /user/:id/export` and `DELETE /user/:id`, with the local cleanup from [D5](#d5-where-the-ids-live). "View transcript" has no handler yet (`Report.jsx:81-84`), it can read `session.transcript`.
+**Recommend** : on backend-ts show `disclaimer` on Research and Report, and add a "Your data" entry using `GET /user/:id/export` and `DELETE /user/:id`, with the local cleanup from [D5](#d5-where-the-ids-live). On FastAPI those routes are per job (`backend/app/main.py:251,262`) and there is no disclaimer field, so the text would have to live in the frontend.
 
 ### D13. Demo data
 
-"Fill demo" types Acme Robotics (`JobPosting.jsx:15-20`). `GET /demo`, on a server with `DEMO_MODE=1`, holds `company_name`, `role_title`, an N26 job text and two transcripts, and `demo:true` returns the stored N26 name and facts whatever text was sent. Acme plus `demo:true` shows the wrong company.
+**backend-ts only.** "Fill demo" types Acme Robotics (`screens/JobPosting.jsx:15-20`). `GET /demo`, on a server with `DEMO_MODE=1`, holds an N26 job and two transcripts, and `demo:true` returns the stored N26 name and facts whatever text was sent, so Acme plus `demo:true` shows the wrong company.
 
-What happens on a demo job :
+The canned score only comes for exactly `transcript` or `followup_transcript`. Answers from the mic or the typed box never match, so they are graded live. On a demo server with no relay key that gets `llm_unavailable`. See [api.md](api.md#demo-mode).
 
-- `transcript` or `followup_transcript`, exactly : `/grade` returns the canned score straight away with `fallback:true` and no LLM call, even when the LLM works, and `/next` after it uses the canned question bank straight away. So `followup_transcript` always answers what the session from `/next` asks. This run always shows the sample feedback label from [D11](#d11-report-content).
-- Any other transcript : `/grade` is always live and gets the normal error if that fails. `/next` tries the LLM for up to 30 s, then falls back to the bank.
-- The live grader is not stable enough to carry the canned run : on `transcript` it gave `star`, `evidence` 6 of 8 times, and the other two rounds would have asked different questions. See [api.md](api.md#demo-mode).
+**Recommend** : when `GET /health` says `demo:true`, fill the form from `GET /demo`, send its `job_description` unchanged, without the line from [D8](#d8-company-role-and-a-url-as-the-posting), and add a path that posts the two transcripts instead of using the mic.
 
-**Recommend** : when `GET /health` says `demo:true`, fill company, role and posting from `GET /demo`, so the form unlocks, send its `job_description` unchanged, without the role and company line from [D8](#d8-company-role-and-a-url-as-the-posting), and post `transcript` and then `followup_transcript`.
+### D15. What the interviewer says first
 
-### D14. Actions that have to wait
+The client scripts its own intro and wrap-up (`voice/interviewFlow.ts:62-65`, `voice/config.ts:34,44`). The intro says it is an AI, but not that this is practice only, not part of hiring, not affiliated with the company, or what gets saved. `flow[0].text` on backend-ts says all of that, and nothing reads it.
 
-- **Research scan** : 4 fake steps of 480 ms and a Skip button (`Research.jsx:10-11,109`). The API sends no progress and takes about 12 s. Use an indeterminate state and remove Skip. "Writing your question plan" is really the wait in step 2.
-- **End session** is a `Link` that leaves at once and counts the interview (`Interview.jsx:227-237`). Make it a button that waits for step 5. `no_candidate_answers` means the session is still open, so stay on the screen. On `store_unavailable`, keep the turns and retry.
-- **Generate my next interview** is a `Link` too (`Report.jsx:77`). It has to wait for `/next`, which is safe to repeat.
+**Recommend** : under both, the spoken intro carries those points. On backend-ts speak `flow[0].text` and `flow.at(-1).text`. On FastAPI add the words to `voice/config.ts`.
 
-## The biggest gap : voice and transcripts
+## Voice
 
-**Neither side captures voice or writes a transcript yet.** Without a transcript there is nothing to grade, so the loop can't run on a real answer whatever else gets wired.
+Settled on `main`, so the earlier options are gone. The client runs the interview (`voice/interviewFlow.ts`), and FastAPI hosts the models :
 
-- **Frontend** : the mic button only flips a state (`Interview.jsx:218`), "Speaking…" is a label (`:144`), `getUserMedia` asks for video only (`:75`), and nothing moves to the next question (`data.js:72`).
-- **Backend** : it never touches audio, has no text interviewer and does not mint Realtime tokens, because the relay has no Realtime endpoint. On 2026-11-02 `/v1/realtime/sessions`, `/v1/realtime/client_secrets`, `/v1/realtime/calls` and a WebSocket upgrade on `/v1/realtime` all gave 404, even though its model list names `stepaudio-2.5-realtime`. `/v1/audio/transcriptions` and `/v1/audio/speech` gave 503 `all_credentials_exhausted`, so those can't be used either right now.
+- **Listening** : its own mic stream (`voice/audio.ts:55-56`), each utterance goes as WAV to `/api/voice/asr`, Whisper on the GPU (`backend/app/speech.py:33-37`).
+- **Speaking** : scripted lines go to `/api/voice/tts`, Kokoro on the CPU (`voice/interviewFlow.ts:68-77`, `backend/app/speech.py:54-56`).
+- **Follow-ups** : the client writes the prompt and calls `/api/voice/chat`, at most one per question (`voice/interviewFlow.ts:170-179,221-257`).
+- **Typed answers** : always offered (`screens/Interview.jsx:205-213,327-337`).
 
-Every option gives the backend the same thing, so the API does not change :
+backend-ts has none of these routes and never touches audio. `flow` and `interviewer_instructions` were written for a voice model the client connects to, and nothing on `main` reads them.
 
-```js
-{role:'interviewer',text:step.text,question_id:step.question_id}
-{role:'candidate',text:answer,question_id:step.question_id}
-```
+If FastAPI wins, the table below does not apply. If backend-ts wins, this is not decided :
 
-The options. This is not decided, the research plans A for the hackathon and B for the product (section 7).
+| | A. FastAPI voice routes next to backend-ts | B. Voice routes in backend-ts | C. Typed only |
+| --- | --- | --- | --- |
+| New work | the proxy above | not built : three routes and a speech service, the models are Python | the mapping only |
+| Runs | both servers, and a GPU for Whisper | backend-ts, a speech service, and a GPU for Whisper | backend-ts only |
+| Follow-up questions | yes, on FastAPI's own LLM settings, outside backend-ts's rate limits and daily cap | yes, once built | no |
+| Fits "answer by voice" (`screens/Landing.jsx:127`) | yes | yes | no |
 
-| | A. OpenAI Realtime (WebRTC) | B. Cascade : STT, LLM, TTS | C. Web Speech API | D. Typed only |
-| --- | --- | --- | --- | --- |
-| Provider token | yes, from a real OpenAI key, not the relay | yes, Deepgram and ElevenLabs in the research | no | no |
-| New backend work | a token route, not built | proxy routes and a live interviewer, neither built | none | none |
-| Real conversation | yes, with `interviewer_instructions` as the prompt | yes, same prompt | no, reads `flow` in order, no follow-ups or interruptions | no |
-| Who receives the voice | OpenAI | Deepgram, and ElevenLabs gets the text | Chrome : Google. See below | nobody |
-| Listed as a processor in the research | yes | yes | no, Google is not listed | no voice processor |
-| Cost of a 15 min session, research section 6 | $0.9 to 2.5, mini $0.32 to 1.0 | $0.30 to 0.60 | no voice cost | no voice cost |
-| Fits "answer by voice" (`Landing.jsx:127`) | yes | yes | yes, as a scripted interview | no |
+**How C behaves**, from reading the code : a failed clip is skipped (`voice/localVoice.ts:113-118`), follow-ups are skipped (`voice/interviewFlow.ts:251-253`), and failed recognition points to the typed box (`screens/Interview.jsx:181-184`). So questions show as captions with no sound (`screens/Interview.jsx:301-305`), and the loop still ends.
 
-**How C works** : `speechSynthesis` reads `session.flow` in order, intro first because it is the AI disclosure. `SpeechRecognition` (`window.SpeechRecognition || window.webkitSpeechRecognition`) takes each answer, a "Done" button ends the turn, and only final results go into `turns`. A typed fallback is required, because MDN marks `SpeechRecognition` as limited availability, not Baseline. The research asks for a text mode anyway (section 8, Fairness). `interviewer_instructions` goes unused.
+**For any voice path** :
 
-**The privacy catch in C** : Chrome sends the recognition audio to Google. MDN : "On some browsers, like Chrome, using Speech Recognition on a web page involves a server-based recognition engine. Your audio is sent to a web service for recognition processing". Chromium's engine points at `https://www.google.com/speech-api/full-duplex/v1`. So these lines would need rewording, because we would not keep the audio but it would still leave the device, to a party the research does not list as a processor (it asks for Art. 28 DPAs with the ones it lists) :
+- The research requires consent and a DPIA for voice, and says to label the voice as synthetic. The lobby has no consent step (`screens/Interview.jsx:294-298`).
+- The accent checks in the eval use simulated text, so Whisper has not been tested for accent differences.
+- "Audio is turned into text and dropped" (`screens/Landing.jsx:145,196`) matches `backend/app/voice.py:5`. The text is not kept to the transcript : `backend/app/voice.py:80` logs what was recognised and `voice/interviewFlow.ts:206` prints the transcript to the console. `DELETE /user/:id` reaches neither.
 
-- "The audio itself is never kept." (`Landing.jsx:145`)
-- "Audio is turned into text and dropped." (`Landing.jsx:196`)
-- the spoken intro, "no audio is stored", stays true of our storage but says nothing about Google
+## Errors and retries
 
-MDN also documents `recognition.processLocally = true` for on-device recognition, after a language pack download. It fails with `language-not-supported` if the pack is missing. Which browsers support it has not been checked.
+Both backends send `{error:{code,message}}`, so `api.js:16` keeps working. On backend-ts it is not enough :
 
-**For any voice option** : the research requires consent and a DPIA for voice, and says to label the voice as synthetic. The accent checks in the eval use simulated text, so none of these speech engines has been tested for accent differences.
+- **`message` is for developers**, like `invalid request`. `api.js:16` keeps only that and the screens show it (`screens/Research.jsx:147`, `screens/Report.jsx:85,172`, `screens/Interview.jsx:201`). Keep `code`, `retryable` and the status on the thrown Error and show your own text per `code`, the table is in [api.md](api.md#errors). `voice/backendClient.ts:44` throws the status only, so the save needs the same.
+- **End session before any answer** gets `no_candidate_answers`, FastAPI accepts it (`backend/app/main.py:178-190`). `voice/interviewFlow.ts:212` moves to `error`, where `:140` ignores new answers, and "Press End session to try again" (`screens/Interview.jsx:150`) gets the same refusal forever. The session stays open, so go back to the question.
+- **A retried save** adds the wrap-up line again (`voice/interviewFlow.ts:203`). That is fine while the session is open, but if the first save landed and only its answer was lost, the retry gets `invalid_state`. Then read `GET /session/:id` and go on if `status` is `completed`.
+- **`grading_in_progress`** takes a reload or a second tab, because `api.js:22-30` only covers one page. "Try again" (`screens/Report.jsx:86`) would get it again. Poll `GET /session/:id` every few seconds until `status` is `graded`. `completed` with `grading_started_at` null means the grade failed and none is running, so call `/grade` again or show the error. Give up after 5 minutes, the length of the grading lease.
+- **No answer at all** (`api.js:12-13`) means network down, too slow, or a body far over the 256 KB limit. Do not repeat `/research` or `/session` on it, they may still be running and each call makes a new job or session.
 
-## Fetch helper
+## Before you sign
 
-```js
-const API = 'http://localhost:8787'
-const MAX_BODY = 256 * 1024
+**Run** on 2026-11-03, against this branch's working tree : a `DEMO_MODE=1` server on the memory store with no relay key, behind Vite 8.3.5 (`vite` and `vite preview`) with the proxy above and a stub on the voice path. Every request body in [Every call](#every-call) as the frontend sends it, then the mapped loop through two rounds, a `POST /session` after `/next`, export, and the transcript snippet on a transcript shaped like the voice flow's.
 
-export async function api(path,{body,method = body ? 'POST' : 'GET',tries = 3} = {}) {
-	const json = body && JSON.stringify(body)
-	if (json && new Blob([json]).size > MAX_BODY) throw Object.assign(new Error('body over 256 KB'),{code:'payload_too_large',retryable:false,status:413})
-	for (let i = 1;;i++) {
-		const res = await fetch(API + path,{method,headers:body ? {'content-type':'application/json'} : {},body:json,signal:AbortSignal.timeout(180000)})
-		const data = await res.json()
-		if (res.ok) return data
-		const {code,message,retryable} = data.error
-		if (!retryable || code === 'grading_in_progress' || i >= tries) throw Object.assign(new Error(message),{code,retryable,status:res.status})
-		await new Promise((r) => setTimeout(r,(Number(res.headers.get('retry-after')) || 2 ** i) * 1000))
-	}
-}
-```
+**Not run** :
 
-```js
-await api('/research',{body:{user_id,job_description}})
-await api(`/session/${id}/start`,{method:'POST'})
-await api(`/session/${id}`)
-```
+- **The frontend.** It was not started and no browser was involved. So what a screen does with an answer is read from the code, not seen : the empty tag, `undefined` in the intro, the throw at `screens/Report.jsx:116`, demo numbers on Progress, the End session loop, the StrictMode double research, typed-only voice and the standalone build.
+- **FastAPI, Whisper and Kokoro.** Their behaviour is read from `backend/` at `c96c683`.
+- **A real LLM.** Demo mode gives canned questions and scores. A live grade of a transcript shaped like the voice flow's, with one turn per utterance and the "Thank you." lines, has not been run, so its effect on the scores is unknown. The waits come from [api.md](api.md#timing).
+- **CORS in a browser.** From the server's headers only : another origin gets 200 with no allow-origin header. Whether the 256 KB limit surfaces differently through the proxy was not tried, and the Chrome numbers in api.md are from an earlier review of direct calls.
 
-- **`grading_in_progress`** is retryable but must not be repeated : poll `GET /session/:id` every few seconds until `status` is `graded`. While polling, `completed` with `grading_started_at` null means the grade failed and none is running, so call `POST /grade` again or show the error, do not keep waiting. Give up after 5 minutes, the length of the grading lease, and offer a retry. A reload or a second tab that lost the `POST` response polls the same way.
-- **Check the size before sending, the helper does.** A body far over the 256 KB limit can surface as a `TypeError` instead of `payload_too_large` (Chrome : 1 MB and up always, 700 to 800 KB sometimes).
-- **A thrown `TypeError` or `TimeoutError`** means no answer : network down, CORS refused, too slow or a body far over the limit. It is deliberately not retried. `/research` and `/session` may still be running on the server, and a repeat would create a second job or session.
-- **`message` is for developers.** Show your own text per `code`, the table is in [api.md](api.md#errors).
-
-## Not checked
-
-- Nothing here was run in a browser, except the Chrome body size numbers, which come from an earlier review and were not measured again. The CORS results come from the server's response headers, the opened-from-disk case included. The helper was run against the real routes in demo mode, with a fake LLM that always fails and with the real relay.
-- The Web Speech facts come from MDN and the Chromium source, not from a test.
-- The relay check covered routes only, on one day, with no audio sent. Its audio routes may work once its credentials recover, but the [README](../README.md#before-real-users) already says to replace the relay before real users.
-- The research PDF is not in the repo, so its lines are quoted by section.
+Also : the research PDF is not in the repo, so its lines are quoted by section. [api.md](api.md#what-the-frontend-owns) still names OpenAI Realtime as the plan, which is out of date against `main`. It is not changed here.

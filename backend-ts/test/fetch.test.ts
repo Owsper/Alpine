@@ -119,7 +119,7 @@ describe('safeFetch ssrf',() => {
 		vi.useFakeTimers({toFake:['Date']})
 		vi.setSystemTime(new Date('2026-03-04T05:06:07.000Z'))
 		const {io} = fakeIo({'https://acme.test/':page()})
-		await expect(safeFetch('https://acme.test/',undefined,{io})).resolves.toEqual({url:'https://acme.test/',html:HTML,text:'hello',retrieved_at:'2026-03-04T05:06:07.000Z'})
+		await expect(safeFetch('https://acme.test/',undefined,{io})).resolves.toEqual({url:'https://acme.test/',text:'hello',retrieved_at:'2026-03-04T05:06:07.000Z'})
 		vi.useRealTimers()
 	})
 
@@ -303,7 +303,7 @@ describe('safeFetch content',() => {
 
 	it('tdm-reservation 0 is fine',async () => {
 		const {io} = fakeIo({'https://acme.test/':page(HTML,{'tdm-reservation':'0'})})
-		await expect(safeFetch('https://acme.test/',undefined,{io})).resolves.toMatchObject({html:HTML})
+		await expect(safeFetch('https://acme.test/',undefined,{io})).resolves.toMatchObject({text:'hello'})
 	})
 
 	it.each([
@@ -331,9 +331,16 @@ describe('safeFetch content',() => {
 		await expect(safeFetch('https://acme.test/',undefined,{io})).rejects.toThrow('not_html')
 	})
 
+	it('keeps the text the route reads and not the page',async () => {
+		const {io} = fakeIo({'https://acme.test/':page('<p>' + 'word '.repeat(10000) + '</p>')})
+		const got = await safeFetch('https://acme.test/',undefined,{io})
+		expect(Object.keys(got).sort()).toEqual(['retrieved_at','text','url'])
+		expect(got.text).toHaveLength(12000)
+	})
+
 	it('accepts xhtml',async () => {
 		const {io} = fakeIo({'https://acme.test/':page(HTML,{'content-type':'application/xhtml+xml'})})
-		await expect(safeFetch('https://acme.test/',undefined,{io})).resolves.toMatchObject({html:HTML})
+		await expect(safeFetch('https://acme.test/',undefined,{io})).resolves.toMatchObject({text:'hello'})
 	})
 
 	it.each([404,500])('refuses status %i',async (status) => {
