@@ -129,9 +129,8 @@ def health() -> dict:
 
 
 @app.post("/api/research", status_code=201)
-async def post_research(body: ResearchRequest, request: Request) -> dict:
+async def post_research(body: ResearchRequest) -> dict:
     job = {
-        "client_id": request.headers.get("x-alpine-client"),
         "id": db.new_id(),
         "title": body.role.strip(),
         "company": body.company.strip(),
@@ -142,7 +141,7 @@ async def post_research(body: ResearchRequest, request: Request) -> dict:
     }
     with db.tx() as conn:
         conn.execute(
-            "INSERT INTO jobs (id, title, company, description, posting_url, company_url, created_at, client_id) VALUES (:id, :title, :company, :description, :posting_url, :company_url, :created_at, :client_id)",
+            "INSERT INTO jobs (id, title, company, description, posting_url, company_url, created_at) VALUES (:id, :title, :company, :description, :posting_url, :company_url, :created_at)",
             job,
         )
     facts = await research.research(job)
@@ -250,18 +249,13 @@ def progress(job_id: str) -> dict:
 
 
 @app.get("/api/sessions")
-def list_sessions(request: Request) -> dict:
-    """Every finished session across jobs, newest first, plus the next planned one, for the dashboard.
-    With ISOLATE_CLIENTS on, only the jobs this browser researched are listed."""
-    owner, params = "", ()
-    if config.ISOLATE_CLIENTS:
-        owner, params = " AND j.client_id = ?", (request.headers.get("x-alpine-client") or "-",)
+def list_sessions() -> dict:
+    """Every finished session across jobs, newest first, plus the next planned one, for the dashboard."""
     with db.tx() as conn:
         sessions = db.rows(
             conn.execute(
                 "SELECT s.*, j.title AS role, j.company AS company FROM sessions s JOIN jobs j ON j.id = s.job_id "
-                f"WHERE s.status IN ('completed', 'graded'){owner} ORDER BY s.created_at DESC",
-                params,
+                "WHERE s.status IN ('completed', 'graded') ORDER BY s.created_at DESC"
             )
         )
         finished = [
@@ -279,12 +273,7 @@ def list_sessions(request: Request) -> dict:
             }
             for s in sessions
         ]
-        planned = db.row(
-            conn.execute(
-                f"SELECT s.* FROM sessions s JOIN jobs j ON j.id = s.job_id WHERE s.status = 'created'{owner} ORDER BY s.created_at DESC LIMIT 1",
-                params,
-            ).fetchone()
-        )
+        planned = db.row(conn.execute("SELECT * FROM sessions WHERE status = 'created' ORDER BY created_at DESC LIMIT 1").fetchone())
         upcoming = None
         if planned:
             job = get_job(conn, planned["job_id"])
@@ -310,10 +299,3 @@ def delete_job(job_id: str) -> dict:
         get_job(conn, job_id)
         conn.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
     return {"ok": True, "deleted": job_id}
-
-
-# Mounted last so the API routes above take precedence over the static files.
-if config.STATIC_DIR:
-    from fastapi.staticfiles import StaticFiles
-
-    app.mount("/", StaticFiles(directory=config.STATIC_DIR, html=True), name="frontend")

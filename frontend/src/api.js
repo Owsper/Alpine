@@ -1,26 +1,12 @@
 // The backend (FastAPI, port 8100 in development, proxied by Vite under /api).
 // Every error comes back as { error: { code, message } }; it is thrown as an Error with that message.
 
-// A random id for this browser. On a public deploy the server only lists the sessions it started.
-const CLIENT_KEY = 'alpine-client-id'
-const clientId = (() => {
-  try {
-    const saved = localStorage.getItem(CLIENT_KEY)
-    if (saved) return saved
-    const fresh = crypto.randomUUID()
-    localStorage.setItem(CLIENT_KEY, fresh)
-    return fresh
-  } catch {
-    return crypto.randomUUID()
-  }
-})()
-
 async function call(path, { method = 'GET', body } = {}) {
   let response
   try {
     response = await fetch(`/api${path}`, {
       method,
-      headers: { 'X-Alpine-Client': clientId, ...(body ? { 'Content-Type': 'application/json' } : {}) },
+      headers: body ? { 'Content-Type': 'application/json' } : undefined,
       body: body ? JSON.stringify(body) : undefined,
     })
   } catch {

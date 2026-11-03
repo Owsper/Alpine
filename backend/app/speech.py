@@ -10,19 +10,12 @@ import os
 from pathlib import Path
 
 import numpy as np
-
-try:  # only the Qwen engines and the GPU memory report need torch; a CPU-only deploy can leave it out
-    import torch
-except ImportError:
-    torch = None
+import torch
 
 ASR_ENGINE = os.environ.get("ASR_ENGINE", "whisper")
 TTS_ENGINE = os.environ.get("TTS_ENGINE", "kokoro")
 TTS_SPEAKER = os.environ.get("TTS_SPEAKER", "Ryan")
 KOKORO_VOICE = os.environ.get("KOKORO_VOICE", "am_michael")
-# large-v3 on the laptop's GPU by default; a CPU host (the free Hugging Face Space) uses a smaller model.
-WHISPER_MODEL = os.environ.get("WHISPER_MODEL", "large-v3")
-WHISPER_DEVICE = os.environ.get("WHISPER_DEVICE", "cuda")
 MODELS = Path(__file__).resolve().parent.parent / "models"
 # Kokoro runs on the CPU, so it can synthesize while the GPU is busy recognising speech.
 TTS_ON_GPU = TTS_ENGINE == "qwen"
@@ -41,7 +34,7 @@ def load() -> None:
         from faster_whisper import WhisperModel
 
         # int8 keeps Whisper near 1.5 GB so it fits beside the TTS model in 6 GB.
-        _asr = WhisperModel(WHISPER_MODEL, device=WHISPER_DEVICE, compute_type="int8_float16" if WHISPER_DEVICE == "cuda" else "int8")
+        _asr = WhisperModel("large-v3", device="cuda", compute_type="int8_float16")
         # The first GPU call is several times slower; pay it now instead of on the first answer.
         list(_asr.transcribe(np.zeros(ASR_RATE, dtype=np.float32), language="en")[0])
     else:
@@ -65,7 +58,7 @@ def load() -> None:
 
 
 def describe() -> dict:
-    used = torch.cuda.memory_allocated() / 2**30 if torch is not None and torch.cuda.is_available() else 0
+    used = torch.cuda.memory_allocated() / 2**30 if torch.cuda.is_available() else 0
     voice = TTS_SPEAKER if TTS_ON_GPU else KOKORO_VOICE
     return {"asr": ASR_ENGINE, "tts": TTS_ENGINE, "voice": voice, "vram_gb": round(used, 2), "ready": _tts is not None}
 
