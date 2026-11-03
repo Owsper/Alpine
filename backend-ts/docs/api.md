@@ -224,6 +224,10 @@ Creates a session with exactly 5 questions : 4 `base` and 1 `anchor`. The anchor
 
 Generated questions follow the language of the job description and never speak as the company : output with we, us or our, or the German or French for those, counts as invalid. The same goes for `/next`. `US` in capitals is fine.
 
+Generated questions also stay off emotion, confidence, personality and how someone sounds : a word like calm, stress, confident, voice, tone or fluent counts as invalid output, unless the job description or the company facts use that word. Then it is about the job, so a posting that says "voice disorders" can get a question about a voice disorder and a company called Calm can be named. `stress` in the job text also allows `stressful`, `milestone` does not allow `tone`, and `stress test` does not allow `stress`. Apply now lines allow nothing, like `if this sounds like you` or `do not hesitate to apply`, while `copy that sounds like the brand` still counts. `pronounced` only allows itself, not `pronunciation`. The same goes for `/next`. Protected traits and speaking as the company get no such exemption, and neither do the tips from `/grade`, whatever the job says.
+
+The server asks the model twice, then answers `llm_bad_output`, and a retry usually works. Measured on 2026-11-03 through this route with `job_description` : 217 of 220 tries returned 200 over plain, tech and such postings. All 3 others used a word of this kind that the posting did not, twice in a row. Some postings do worse, because the model reaches for a related word the posting never used : a copywriter posting that got `voice` returned 200 on 4 of 8 tries, a speech therapist posting that got `fluency` on 3 of 8.
+
 `progress` only appears on sessions made by `/next`. A session made here on an existing job starts a fresh comparison.
 
 Two request forms. Prefer the first, the second has no company facts because it skips research.
