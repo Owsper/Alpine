@@ -79,6 +79,11 @@ def connect() -> sqlite3.Connection:
 def init() -> None:
     with connect() as conn:
         conn.executescript(SCHEMA)
+        # Added after the first release; older databases get the column on start.
+        try:
+            conn.execute("ALTER TABLE jobs ADD COLUMN client_id TEXT")
+        except sqlite3.OperationalError:
+            pass
 
 
 @contextmanager

@@ -121,3 +121,14 @@ def test_sessions_list_feeds_the_dashboard(client):
     assert listed["sessions"][0]["transcript"]["turns"] and len(listed["sessions"][0]["scores"]) == 6
     assert "runs" not in listed["sessions"][0]["scores"][0]
     assert listed["upcoming"]["jobId"] == job_id and listed["upcoming"]["status"] == "created"
+
+
+def test_sessions_are_private_per_browser(client, monkeypatch):
+    monkeypatch.setattr(config, "ISOLATE_CLIENTS", True)
+    mine, theirs = {"x-alpine-client": "browser-a"}, {"x-alpine-client": "browser-b"}
+    job_id = client.post("/api/research", json={"company": "Acme Robotics", "role": "SWE", "description": "Fleet control in Go and TypeScript."}, headers=mine).json()["job"]["id"]
+    session = client.post("/api/session", json={"job_id": job_id}).json()
+    client.post(f"/api/session/{session['sessionId']}/transcript", json={"turns": answer_turns(session), "durationSec": 120})
+    assert [s["sessionId"] for s in client.get("/api/sessions", headers=mine).json()["sessions"]] == [session["sessionId"]]
+    assert client.get("/api/sessions", headers=theirs).json()["sessions"] == []
+    assert client.get("/api/sessions").json()["sessions"] == []

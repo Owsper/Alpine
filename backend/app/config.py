@@ -32,5 +32,9 @@ CORS_ORIGINS = [o.strip() for o in os.environ.get("CORS_ORIGINS", "http://localh
 
 # Speech models (Whisper + Kokoro) load in the background; off for tests and machines without them.
 VOICE_ENABLED = _flag("VOICE_ENABLED", "true")
+# Public deploys: every browser sends a random id and only ever sees its own sessions. Off for local use.
+ISOLATE_CLIENTS = _flag("ISOLATE_CLIENTS", "false")
+# When set, the built frontend (landing + app) is served from this folder next to the API.
+STATIC_DIR = os.environ.get("STATIC_DIR", "")
 
 DIMENSIONS = ["STAR", "Relevance", "Role knowledge", "Company fit", "Conciseness", "Evidence"]
