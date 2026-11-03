@@ -1,7 +1,7 @@
 // Everything the dashboard shows, derived from real sessions (GET /api/sessions). No sample numbers:
 // when there is nothing to show yet, views render an empty state instead.
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from './api.js'
 
 /** Every minute of the candidate's own speech climbs this far; the summit is the Matterhorn's 4,478 m. */
@@ -56,10 +56,14 @@ function enrich(session) {
 export function useDashboard() {
   const [state, setState] = useState({ loading: true, error: '', sessions: [], upcoming: null, dimensions: [] })
 
+  const latest = useRef(0)
+
+  // Several reloads can overlap (a view change, a finished grade); only the newest answer is applied.
   const reload = useCallback(() => {
+    const request = ++latest.current
     api.sessions().then(
-      (data) => setState({ loading: false, error: '', sessions: data.sessions.map(enrich), upcoming: data.upcoming, dimensions: data.dimensions }),
-      (error) => setState((current) => ({ ...current, loading: false, error: error.message })),
+      (data) => request === latest.current && setState({ loading: false, error: '', sessions: data.sessions.map(enrich), upcoming: data.upcoming, dimensions: data.dimensions }),
+      (error) => request === latest.current && setState((current) => ({ ...current, loading: false, error: error.message })),
     )
   }, [])
 

@@ -90,18 +90,22 @@ export default function Practice({ data }) {
               <b>{fmtTime(result.elapsed)}</b>
               <small>length</small>
             </div>
-            <div>
-              <b>{result.share}%</b>
-              <small>speaking</small>
-            </div>
-            <div>
-              <b>{result.pauses}</b>
-              <small>pauses over {PAUSE_S} s</small>
-            </div>
-            <div>
-              <b>{result.longest.toFixed(1)} s</b>
-              <small>longest pause</small>
-            </div>
+            {result.share > 0 && (
+              <>
+                <div>
+                  <b>{result.share}%</b>
+                  <small>speaking</small>
+                </div>
+                <div>
+                  <b>{result.pauses}</b>
+                  <small>pauses over {PAUSE_S} s</small>
+                </div>
+                <div>
+                  <b>{result.longest.toFixed(1)} s</b>
+                  <small>longest pause</small>
+                </div>
+              </>
+            )}
           </div>
           <p className="note">Your answers are saved as text and being graded now. The audio was never stored.</p>
           <div className="actions" style={{ marginTop: 18 }}>
@@ -394,7 +398,7 @@ function Live({ jobId, facts, onCancel, onDone }) {
   const status = phase === 'starting' ? 'Preparing the interviewer' : phase === 'saving' ? 'Saving your answers' : speaking ? 'Interviewer is asking' : hearing ? 'Listening to you' : 'Your turn'
 
   return (
-    <div className={`live ${hearing ? 'rec' : ''}`} data-anchor data-ax=".5" data-ay=".5" data-ar=".5" data-orb='{"amp":0.12,"m":0,"alpha":0.9,"warm":0.5,"tilt":0.3}'>
+    <div className={`live ${hearing ? 'rec' : ''}`} data-anchor data-ax=".88" data-ay=".45" data-ar=".2" data-orb='{"amp":0.12,"m":0,"alpha":0.75,"warm":0.5,"tilt":0.3}'>
       <div className="st">
         <i />
         <span>{status}</span>
@@ -411,7 +415,8 @@ function Live({ jobId, facts, onCancel, onDone }) {
       </p>
       <LiveWave level={level} hearing={hearingRef} />
       <div className="clock">{fmtTime(elapsed)}</div>
-      <div className="stats">
+      {/* Speaking stats only mean something once the microphone has heard the candidate. */}
+      <div className="stats" style={{ visibility: s.speak > 0.5 ? 'visible' : 'hidden' }}>
         <div>
           <b>{elapsed > 0 ? Math.round((s.speak / elapsed) * 100) : 0}%</b>
           <small>speaking</small>

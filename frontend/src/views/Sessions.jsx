@@ -36,7 +36,14 @@ export default function Sessions({ data }) {
   const { id } = useParams()
   const navigate = useNavigate()
   const { sessions, loading, reload } = data
-  const selected = sessions.find((s) => s.sessionId === id) ?? sessions[0]
+  const selected = id ? sessions.find((s) => s.sessionId === id) : sessions[0]
+  // A session that was just finished may not be in the list yet: fetch again rather than show another one.
+  const missing = Boolean(id) && !loading && !selected
+  useEffect(() => {
+    if (!missing) return undefined
+    const timer = setTimeout(reload, 800)
+    return () => clearTimeout(timer)
+  }, [missing, reload, sessions])
 
   return (
     <>
@@ -73,6 +80,11 @@ export default function Sessions({ data }) {
               ))}
             </div>
           </div>
+          {missing && (
+            <article className="card alt2 rise" style={{ '--d': 2 }}>
+              <p className="empty">Loading this take…</p>
+            </article>
+          )}
           {selected && (
             <Replay
               key={selected.sessionId}
