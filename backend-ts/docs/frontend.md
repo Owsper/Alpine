@@ -4,6 +4,17 @@
 
 Paths like `screens/Report.jsx:52` are relative to `frontend/src/`. All frontend and `backend/` line numbers are from `c96c683` and will drift.
 
+> **This map is out of date.** `main` moved to `fbc6227` on 2026-11-03 : the product is now called Alpine, `screens/*`, `flow.jsx` and `data.js` are gone, and the UI is `views/Practice.jsx`, `views/Overview.jsx` and `views/Sessions.jsx`. Rewrite the per-screen parts below before following them. What pointing the new frontend at backend-ts needs, read from the code and not run :
+>
+> - **Dashboard** : `dashboard.js:60` reads `GET /api/sessions`, a list of all sessions with no user. backend-ts has no such route. An adapter can build it from `GET /user/:id/export`, per user.
+> - **Timings** : the dashboard reads `startedAt`, `endedAt` and `durationSec` on the transcript. backend-ts rejects these fields, and without them the dashboard shows NaN. Keep them in the browser, or add optional fields to `Turn`.
+> - **Requests** : `/research` sends `{company,role,description}` and `/session` sends `{job_id}`, both get `bad_request` until they carry `user_id` and the fields in [api.md](api.md). The transcript also needs mapping to `{turns:[{role,text,question_id}],final}`.
+> - **Planned session** : `Practice.jsx:59-63` expects `/session` to hand back the session `/next` planned. Here it makes a new one, so load the plan with `GET /session/:id`.
+> - **Waits** : `Sessions.jsx:314` says grading takes a few seconds, the median here is 34 s, and a second `/grade` during a round gets 409 `grading_in_progress`.
+> - **Voice** : `/api/voice/*` stays on FastAPI, so two servers run.
+>
+> About 200 to 300 lines and 6 to 9 hours for a scripted N26 demo. That is an estimate, nothing was prototyped on the new frontend.
+
 Sign-off means two things : answer the [decisions](#decisions-needed) by number, and close the [open points in api.md](api.md#open-points-for-sign-off). The voice on `main` answers points 1 to 3 there : no voice token, one Turn per utterance with its question id, one save at the end. Points 4 to 6 are still open.
 
 ## Before any screen works
