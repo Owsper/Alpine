@@ -56,7 +56,7 @@ async def _fetch(url: str) -> str | None:
         return None
     try:
         async with httpx.AsyncClient(timeout=8, follow_redirects=False) as client:
-            response = await client.get(url, headers={"User-Agent": "InterviewVerse research bot"})
+            response = await client.get(url, headers={"User-Agent": "Alpine research bot"})
             if response.status_code != 200 or "html" not in response.headers.get("content-type", ""):
                 return None
             return _page_text(response.text[:MAX_PAGE_BYTES])

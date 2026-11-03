@@ -1,12 +1,12 @@
-# InterviewVerse
+# Alpine
 
 Practice a job interview out loud with an AI interviewer, get scores that quote what you said, and a next
 interview aimed at your weakest answers.
 
 ```
-InterviewVerse/
+Alpine/
   backend/    FastAPI: research, sessions, grading, next-session plans, and the voice models
-  frontend/   React + Vite: landing page, the five-step app, the voice interview
+  frontend/   React + Vite: landing page and the app (Overview, Sessions, Practice with the voice interview)
 ```
 
 ## How the parts feed each other

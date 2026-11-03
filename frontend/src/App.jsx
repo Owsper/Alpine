@@ -24,14 +24,14 @@ export default function App() {
   const { reload } = data
   useEffect(() => {
     window.scrollTo(0, 0)
-    document.title = `${view[0].toUpperCase()}${view.slice(1)} · InterviewVerse`
+    document.title = `${view[0].toUpperCase()}${view.slice(1)} · Alpine`
     reload()
   }, [view, reload])
 
   return (
     <>
       <nav className="rail" aria-label="App">
-        <a className="logo" href="/" aria-label="InterviewVerse home">
+        <a className="logo" href="/" aria-label="Alpine home">
           <svg viewBox="0 0 26 22">
             <path d="M1 21 L9 6 L14 14 L18 8 L25 21 Z" />
           </svg>

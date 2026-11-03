@@ -10,7 +10,7 @@ async function call(path, { method = 'GET', body } = {}) {
       body: body ? JSON.stringify(body) : undefined,
     })
   } catch {
-    throw new Error('The InterviewVerse server is not reachable. Is it running?')
+    throw new Error('The Alpine server is not reachable. Is it running?')
   }
   const data = await response.json().catch(() => ({}))
   if (!response.ok) throw new Error(data.error?.message ?? data.detail ?? `Request failed (${response.status}).`)

@@ -1,4 +1,4 @@
-"""InterviewVerse API.
+"""Alpine API.
 
 Flow: POST /api/research -> POST /api/session -> (voice) transcript -> POST /api/grade -> POST /api/next.
 Session states move one way only: created -> in_progress -> completed -> graded.
@@ -30,7 +30,7 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title="InterviewVerse API", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="Alpine API", version="0.1.0", lifespan=lifespan)
 app.include_router(voice.router)
 app.add_middleware(CORSMiddleware, allow_origins=config.CORS_ORIGINS, allow_methods=["*"], allow_headers=["*"])
 

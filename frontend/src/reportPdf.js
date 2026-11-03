@@ -87,7 +87,7 @@ export function buildReportPdf({ job, date, title, stats, rows, previous, latest
   const comparing = rows[0].after !== undefined
   let top = 62
 
-  page.text('InterviewVerse', left, top, { size: 12, bold: true, color: COLORS.primary })
+  page.text('Alpine', left, top, { size: 12, bold: true, color: COLORS.primary })
   top += 34
   page.text(title, left, top, { size: 24, bold: true })
   top += 24
@@ -158,7 +158,7 @@ export function downloadPdf(pdf, company) {
   const url = URL.createObjectURL(new Blob([pdf], { type: 'application/pdf' }))
   const link = document.createElement('a')
   link.href = url
-  link.download = `interviewverse-report${slug ? `-${slug}` : ''}.pdf`
+  link.download = `alpine-report${slug ? `-${slug}` : ''}.pdf`
   document.body.append(link)
   link.click()
   link.remove()

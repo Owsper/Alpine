@@ -1,7 +1,7 @@
 {
-  "name": "interviewverse",
+  "name": "alpine",
   "private": true,
-  "description": "InterviewVerse: AI voice interview practice. One backend (API + voice models) and one frontend.",
+  "description": "Alpine: AI voice interview practice. One backend (API + voice models) and one frontend.",
   "scripts": {
     "dev": "concurrently -n api,web -c green,cyan \"npm:backend\" \"npm:frontend\"",
     "backend": "cd backend && .venv\\Scripts\\python -m uvicorn app.main:app --port 8100",

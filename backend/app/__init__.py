@@ -1,1 +1,1 @@
-"""InterviewVerse API: research, sessions, grading and next-session planning."""
+"""Alpine API: research, sessions, grading and next-session planning."""
