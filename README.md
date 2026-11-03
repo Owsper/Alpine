@@ -16,11 +16,17 @@ and a next interview aimed at your weakest answers.
 ![Python 3.13](https://img.shields.io/badge/Python-3.13-14382a?style=flat-square&logo=python&logoColor=b9f0dc)
 [![License: MIT](https://img.shields.io/badge/license-MIT-14382a?style=flat-square)](LICENSE)
 
-[Features](#features) · [How it works](#how-it-works) · [Quick start](#quick-start) · [Project status](#project-status) · [Contributing](CONTRIBUTING.md)
+[Features](#features) · [Demo](#see-it-in-action) · [How it works](#how-it-works) · [Quick start](#quick-start) · [Project status](#project-status) · [Contributing](CONTRIBUTING.md)
 
 </div>
 
-![The Alpine landing page](docs/images/landing.jpg)
+[![Alpine: the moment you lose the room, three steps to a real take, scores that quote you, and every take climbs](docs/images/promo-preview.webp)](https://cdn.jsdelivr.net/gh/Owsper/Alpine@main/video/out/alpine-promo.mp4)
+
+<p align="center">
+  <a href="https://cdn.jsdelivr.net/gh/Owsper/Alpine@main/video/out/alpine-promo.mp4"><b>▶ Watch the promo with sound (0:41)</b></a>
+  ·
+  <a href="https://cdn.jsdelivr.net/gh/Owsper/Alpine@main/video/out/alpine-demo.mp4"><b>▶ Watch the product demo (1:26)</b></a>
+</p>
 
 ## Features
 
@@ -32,16 +38,22 @@ and a next interview aimed at your weakest answers.
 - **A next interview that adapts.** Your two weakest dimensions shape the next session: three questions on them, one repeated anchor and one new angle.
 - **Progress you can see.** Track scores across takes and climb toward a 4,478 m summit, 150 m for every minute you speak.
 
+## See it in action
+
+The real app, recorded end to end: check the facts, answer the interview, read the report and track your progress.
+
+[![Product demo: the facts, the interview, the report and the overview](docs/images/demo-preview.webp)](https://cdn.jsdelivr.net/gh/Owsper/Alpine@main/video/out/alpine-demo.mp4)
+
+<p align="center"><a href="https://cdn.jsdelivr.net/gh/Owsper/Alpine@main/video/out/alpine-demo.mp4"><b>▶ Watch the full demo with narration (1:26)</b></a></p>
+
 ## Screenshots
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/images/overview.jpg" alt="Overview with altitude, scores out of 5 and progress across takes"></td>
-    <td width="50%"><img src="docs/images/replay.jpg" alt="Session replay with a timeline and the transcript"></td>
+    <td colspan="2"><img src="docs/images/landing.jpg" alt="The Alpine landing page"></td>
   </tr>
   <tr>
-    <td align="center"><b>Overview</b>: altitude, scores and progress</td>
-    <td align="center"><b>Sessions</b>: replay any take from its transcript</td>
+    <td colspan="2" align="center"><b>Landing page</b>: rehearse the interview, then just show up</td>
   </tr>
   <tr>
     <td width="50%"><img src="docs/images/practice.jpg" alt="Practice form for the role, company and job post"></td>
@@ -51,9 +63,25 @@ and a next interview aimed at your weakest answers.
     <td align="center"><b>Practice</b>: start from a job post</td>
     <td align="center"><b>Facts</b>: check what the interviewer will use</td>
   </tr>
+  <tr>
+    <td width="50%"><img src="docs/images/interview.jpg" alt="Live interview showing a follow-up question after a vague answer"></td>
+    <td width="50%"><img src="docs/images/report.jpg" alt="Report with six scores, each quoting the answer and giving one thing to fix"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Interview</b>: a vague answer gets a follow-up</td>
+    <td align="center"><b>Report</b>: every score quotes what you said</td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/images/replay.jpg" alt="Session replay with a timeline and the transcript"></td>
+    <td width="50%"><img src="docs/images/overview.jpg" alt="Overview with altitude, scores out of 5 and progress across takes"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Sessions</b>: replay any take from its transcript</td>
+    <td align="center"><b>Overview</b>: altitude, scores and progress</td>
+  </tr>
 </table>
 
-<sub>Screenshots use sample sessions for Acme Robotics, the fictional demo company, scored by the rule-based demo grader.</sub>
+<sub>Interview and Report are stills from the product demo, with scripted answers. Sessions and Overview use sample sessions scored by the rule-based demo grader. All of them use Acme Robotics, the fictional demo company.</sub>
 
 ## How it works
 
